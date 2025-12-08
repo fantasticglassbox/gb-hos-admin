@@ -1,0 +1,202 @@
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Plus, MapPin, Building2, ArrowLeft } from 'lucide-react';
+import ImageUpload from '../components/ImageUpload';
+import { useHotel } from '../context/HotelContext';
+
+interface Hotel {
+  ID: number;
+  name: string;
+  address: string;
+  description: string;
+  image_url: string;
+}
+
+const Hotels = () => {
+  const { fetchHotels } = useHotel(); // To refresh selector after adding
+  const [hotels, setHotels] = useState<Hotel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<'list' | 'create'>('list');
+  const [newHotel, setNewHotel] = useState({ name: '', address: '', description: '', image_url: '' });
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    loadHotels();
+  }, []);
+
+  const loadHotels = async () => {
+    try {
+      const response = await axios.get('http://localhost:8080/api/hotels');
+      setHotels(response.data);
+    } catch (error) {
+      console.error('Error fetching hotels:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddHotel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await axios.post('http://localhost:8080/api/hotels', newHotel);
+      setNewHotel({ name: '', address: '', description: '', image_url: '' });
+      setView('list');
+      loadHotels();
+      fetchHotels(); // Refresh global context
+    } catch (error) {
+      console.error('Error creating hotel:', error);
+      alert('Failed to create hotel');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // --- CREATE VIEW ---
+  if (view === 'create') {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <div className="flex items-center gap-4 mb-8">
+          <button 
+            onClick={() => setView('list')}
+            className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
+          >
+            <ArrowLeft size={24} />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Register New Hotel</h1>
+            <p className="text-gray-500 text-sm">Add a new property to the system</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+          <form onSubmit={handleAddHotel} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hotel Name</label>
+                <input 
+                  type="text" 
+                  required
+                  className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
+                  value={newHotel.name}
+                  onChange={(e) => setNewHotel({...newHotel, name: e.target.value})}
+                  placeholder="e.g. Grand Hyatt Jakarta"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-3.5 text-gray-400" size={18} />
+                  <input 
+                    type="text" 
+                    required
+                    className="w-full border p-3 pl-10 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
+                    value={newHotel.address}
+                    onChange={(e) => setNewHotel({...newHotel, address: e.target.value})}
+                    placeholder="City, Country"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea 
+                className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
+                value={newHotel.description}
+                onChange={(e) => setNewHotel({...newHotel, description: e.target.value})}
+                rows={4}
+                placeholder="Brief description of the property..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image</label>
+              <div className="border-2 border-dashed border-gray-200 rounded-xl p-4">
+                <ImageUpload 
+                  value={newHotel.image_url}
+                  onChange={(url) => setNewHotel({...newHotel, image_url: url})}
+                  label="Click to upload cover image"
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 flex justify-end gap-3 border-t border-gray-50">
+              <button 
+                type="button" 
+                onClick={() => setView('list')}
+                className="px-6 py-2.5 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={submitting}
+                className="px-6 py-2.5 bg-[#008491] text-white hover:bg-[#006a76] rounded-lg font-medium shadow-md shadow-gray-200 disabled:opacity-70 transition-all"
+              >
+                {submitting ? 'Registering...' : 'Register Hotel'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // --- LIST VIEW ---
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">Hotel Management</h1>
+          <p className="text-gray-500 text-sm mt-1">Manage properties and locations</p>
+        </div>
+        <button 
+          onClick={() => setView('create')}
+          className="bg-[#008491] text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-[#006a76] shadow-md shadow-gray-200 transition-all"
+        >
+          <Plus size={20} />
+          Register Hotel
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loading ? (
+          <p className="text-gray-500 col-span-full text-center py-12">Loading hotels...</p>
+        ) : hotels.map((hotel) => (
+          <div key={hotel.ID} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-md transition-shadow">
+            <div className="relative h-48 bg-gray-100">
+              {hotel.image_url ? (
+                <img 
+                  src={hotel.image_url} 
+                  alt={hotel.name} 
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-400">
+                  <Building2 size={48} />
+                </div>
+              )}
+            </div>
+            <div className="p-5">
+              <h3 className="font-bold text-lg text-gray-900 mb-1">{hotel.name}</h3>
+              <div className="flex items-center gap-1 text-gray-500 text-sm mb-3">
+                <MapPin size={14} />
+                <span>{hotel.address}</span>
+              </div>
+              <p className="text-gray-600 text-sm line-clamp-2 mb-4 min-h-[40px]">{hotel.description}</p>
+              
+              <div className="pt-4 border-t border-gray-50 flex justify-end">
+                <button className="text-sm text-[#008491] hover:text-[#006a76] font-medium hover:underline">
+                  Manage Details
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default Hotels;
