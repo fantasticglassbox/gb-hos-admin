@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Plus, Trash2, ArrowLeft, Image as ImageIcon, Video } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { useHotel } from '../context/HotelContext';
+import { API_URL } from '../config';
 
 interface Ad {
   ID: number;
@@ -10,6 +11,9 @@ interface Ad {
   description: string;
   image_url: string;
   is_active: boolean;
+  duration_seconds: number;
+  start_date: string | null;
+  end_date: string | null;
 }
 
 const Ads = () => {
@@ -21,7 +25,14 @@ const Ads = () => {
   const [view, setView] = useState<'list' | 'create'>('list');
   
   // Form State
-  const [newAd, setNewAd] = useState({ title: '', description: '', image_url: '' });
+  const [newAd, setNewAd] = useState({ 
+    title: '', 
+    description: '', 
+    image_url: '',
+    duration_seconds: 10,
+    start_date: '',
+    end_date: ''
+  });
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -32,7 +43,7 @@ const Ads = () => {
   const fetchAds = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:8080/api/ads');
+      const response = await axios.get(`${API_URL}/ads`);
       setAds(response.data);
     } catch (error) {
       console.error('Error fetching ads:', error);
@@ -45,11 +56,24 @@ const Ads = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await axios.post('http://localhost:8080/api/ads', {
-        ...newAd,
-        is_active: true
-      });
-      setNewAd({ title: '', description: '', image_url: '' });
+      const adData: any = {
+        title: newAd.title,
+        description: newAd.description,
+        image_url: newAd.image_url,
+        is_active: true,
+        duration_seconds: Number(newAd.duration_seconds) || 10,
+      };
+      
+      // Add dates only if provided
+      if (newAd.start_date) {
+        adData.start_date = newAd.start_date;
+      }
+      if (newAd.end_date) {
+        adData.end_date = newAd.end_date;
+      }
+      
+      await axios.post(`${API_URL}/ads`, adData);
+      setNewAd({ title: '', description: '', image_url: '', duration_seconds: 10, start_date: '', end_date: '' });
       setView('list');
       fetchAds();
     } catch (error) {
@@ -62,7 +86,7 @@ const Ads = () => {
   const handleDeleteAd = async (id: number) => {
     if (!confirm('Are you sure you want to delete this ad?')) return;
     try {
-      await axios.delete(`http://localhost:8080/api/ads/${id}`);
+      await axios.delete(`${API_URL}/ads/${id}`);
       fetchAds();
     } catch (error) {
       console.error('Error deleting ad:', error);
@@ -122,6 +146,43 @@ const Ads = () => {
                 placeholder="Details about the promotion..."
                 rows={4}
               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Display Duration (seconds)</label>
+                <input 
+                  type="number" 
+                  min="1"
+                  max="300"
+                  required
+                  className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
+                  value={newAd.duration_seconds}
+                  onChange={(e) => setNewAd({...newAd, duration_seconds: Number(e.target.value) || 10})}
+                  placeholder="10"
+                />
+                <p className="text-xs text-gray-400 mt-1">How long each ad displays (1-300 seconds)</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date (Optional)</label>
+                <input 
+                  type="datetime-local" 
+                  className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
+                  value={newAd.start_date}
+                  onChange={(e) => setNewAd({...newAd, start_date: e.target.value})}
+                />
+                <p className="text-xs text-gray-400 mt-1">When to start showing this ad</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Date (Optional)</label>
+                <input 
+                  type="datetime-local" 
+                  className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
+                  value={newAd.end_date}
+                  onChange={(e) => setNewAd({...newAd, end_date: e.target.value})}
+                />
+                <p className="text-xs text-gray-400 mt-1">When to stop showing this ad</p>
+              </div>
             </div>
 
             <div className="pt-4 flex justify-end gap-3 border-t border-gray-50">
@@ -208,7 +269,23 @@ const Ads = () => {
               
               <div className="p-5">
                 <h3 className="font-bold text-lg text-gray-900 mb-2 truncate">{ad.title}</h3>
-                <p className="text-gray-500 text-sm mb-4 line-clamp-2 min-h-[40px]">{ad.description}</p>
+                <p className="text-gray-500 text-sm mb-3 line-clamp-2 min-h-[40px]">{ad.description}</p>
+                
+                <div className="flex flex-wrap gap-2 mb-3 text-xs">
+                  <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                    {ad.duration_seconds}s duration
+                  </span>
+                  {ad.start_date && (
+                    <span className="bg-green-50 text-green-700 px-2 py-1 rounded">
+                      Starts: {new Date(ad.start_date).toLocaleDateString()}
+                    </span>
+                  )}
+                  {ad.end_date && (
+                    <span className="bg-orange-50 text-orange-700 px-2 py-1 rounded">
+                      Ends: {new Date(ad.end_date).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
                 
                 <div className="flex justify-between items-center pt-4 border-t border-gray-50">
                   <a 

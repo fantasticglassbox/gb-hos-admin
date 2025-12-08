@@ -8,6 +8,7 @@ import Modal from '../components/Modal';
 import CategoryForm from '../components/forms/CategoryForm';
 import MenuItemForm from '../components/forms/MenuItemForm';
 import ModifierManager from '../components/forms/ModifierManager';
+import { API_URL } from '../config';
 
 const ServiceDetail = () => {
   const { id } = useParams();
@@ -38,7 +39,7 @@ const ServiceDetail = () => {
 
   const fetchService = async () => {
     try {
-      const response = await axios.get(`http://localhost:8080/api/services/${id}`);
+      const response = await axios.get(`${API_URL}/services/${id}`);
       setService(response.data);
       
       // Refresh active modifier item if open

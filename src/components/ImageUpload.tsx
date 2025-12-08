@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import axios from 'axios';
 import { Upload, X } from 'lucide-react';
+import { API_URL } from '../config';
 
 interface ImageUploadProps {
   value: string;
@@ -21,7 +22,7 @@ const ImageUpload = ({ value, onChange, label = "Media" }: ImageUploadProps) => 
     formData.append('file', file);
 
     try {
-      const response = await axios.post('http://localhost:8080/api/upload', formData, {
+      const response = await axios.post(`${API_URL}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

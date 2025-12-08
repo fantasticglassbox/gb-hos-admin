@@ -2,6 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import type { Service } from '../../types';
 import ImageUpload from '../ImageUpload';
+import { API_URL } from '../../config';
 
 interface MenuItemFormProps {
   categories: Service['categories'];
@@ -29,7 +30,7 @@ const MenuItemForm = ({ categories, initialCategoryId, onSuccess, onCancel }: Me
 
     setLoading(true);
     try {
-      await axios.post(`http://localhost:8080/api/menu/items`, {
+      await axios.post(`${API_URL}/menu/items`, {
         category_id: categoryId,
         ...newItem
       });

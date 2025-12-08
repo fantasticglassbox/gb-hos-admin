@@ -4,6 +4,7 @@ import { Monitor, Plus, Trash2, Smartphone, CheckCircle, AlertCircle } from 'luc
 import { useHotel } from '../context/HotelContext';
 import Modal from '../components/Modal';
 import type { Device } from '../types';
+import { API_URL } from '../config';
 
 const Devices = () => {
   const { selectedHotel } = useHotel();
@@ -27,7 +28,7 @@ const Devices = () => {
     if (!selectedHotel) return;
     setLoading(true);
     try {
-      const response = await axios.get(`http://localhost:8080/api/devices?hotel_id=${selectedHotel.ID}`);
+      const response = await axios.get(`${API_URL}/devices?hotel_id=${selectedHotel.ID}`);
       setDevices(response.data);
     } catch (error) {
       console.error('Error fetching devices:', error);
@@ -47,7 +48,7 @@ const Devices = () => {
     try {
       // Actually, let's try passing hotel_id=0 explicitly if backend supports it matching 0.
       // But query param usually comes as string. "0" should match hotel_id=0.
-      const response = await axios.get(`http://localhost:8080/api/devices?hotel_id=0`);
+      const response = await axios.get(`${API_URL}/devices?hotel_id=0`);
       setPendingDevices(response.data);
     } catch (error) {
       console.error('Error fetching pending devices:', error);
@@ -60,7 +61,7 @@ const Devices = () => {
 
     setCreating(true);
     try {
-      await axios.post('http://localhost:8080/api/devices', {
+      await axios.post(`${API_URL}/devices`, {
         hotel_id: selectedHotel?.ID,
         ...newDevice
       });
@@ -81,7 +82,7 @@ const Devices = () => {
 
     setCreating(true);
     try {
-      await axios.put(`http://localhost:8080/api/devices/${selectedPendingDevice.ID}`, {
+      await axios.put(`${API_URL}/devices/${selectedPendingDevice.ID}`, {
         hotel_id: selectedHotel?.ID,
         name: newDevice.name,
         room_number: newDevice.room_number,
@@ -109,7 +110,7 @@ const Devices = () => {
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to remove this device? It will be logged out.')) return;
     try {
-      await axios.delete(`http://localhost:8080/api/devices/${id}`);
+      await axios.delete(`${API_URL}/devices/${id}`);
       setDevices(devices.filter(d => d.ID !== id));
       setPendingDevices(pendingDevices.filter(d => d.ID !== id));
     } catch (error) {

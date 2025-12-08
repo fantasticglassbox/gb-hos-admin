@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { API_URL } from '../../config';
 
 interface CategoryFormProps {
   serviceId: string;
@@ -17,7 +18,7 @@ const CategoryForm = ({ serviceId, onSuccess, onCancel }: CategoryFormProps) => 
     
     setLoading(true);
     try {
-      await axios.post(`http://localhost:8080/api/menu/categories`, {
+      await axios.post(`${API_URL}/menu/categories`, {
         service_id: Number(serviceId),
         name: name
       });

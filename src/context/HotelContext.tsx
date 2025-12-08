@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
+import { API_URL } from '../config';
 
 interface Hotel {
   ID: number;
@@ -26,7 +27,7 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const fetchHotels = async () => {
     try {
-      const response = await axios.get('http://localhost:8080/api/hotels');
+      const response = await axios.get(`${API_URL}/hotels`);
       setHotels(response.data);
       
       // Restore selection or default to first

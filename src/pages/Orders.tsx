@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { format } from 'date-fns';
 import { Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { API_URL } from '../config';
 
 interface OrderItem {
   ID: number;
@@ -36,7 +37,7 @@ const Orders = () => {
 
   const fetchOrders = async () => {
     try {
-      const response = await axios.get('http://localhost:8080/api/orders');
+      const response = await axios.get(`${API_URL}/orders`);
       // Sort by newest first
       const sortedOrders = response.data.sort((a: Order, b: Order) => 
         new Date(b.CreatedAt).getTime() - new Date(a.CreatedAt).getTime()
@@ -51,7 +52,7 @@ const Orders = () => {
 
   const updateStatus = async (id: number, status: string) => {
     try {
-      await axios.patch(`http://localhost:8080/api/orders/${id}/status`, { status });
+      await axios.patch(`${API_URL}/orders/${id}/status`, { status });
       fetchOrders();
     } catch (error) {
       console.error('Error updating status:', error);

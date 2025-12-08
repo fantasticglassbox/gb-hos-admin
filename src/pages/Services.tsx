@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Plus, Edit2, Trash2, ArrowLeft } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
+import { API_URL } from '../config';
 
 interface Service {
   ID: number;
@@ -30,7 +31,7 @@ const Services = () => {
   const fetchServices = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`http://localhost:8080/api/services?hotel_id=${selectedHotel?.ID}`);
+      const response = await axios.get(`${API_URL}/services?hotel_id=${selectedHotel?.ID}`);
       setServices(response.data);
     } catch (error) {
       console.error('Error fetching services:', error);
@@ -45,7 +46,7 @@ const Services = () => {
     
     setSubmitting(true);
     try {
-      await axios.post('http://localhost:8080/api/services', {
+      await axios.post(`${API_URL}/services`, {
         ...newService,
         price: Number(newService.price),
         hotel_id: selectedHotel.ID

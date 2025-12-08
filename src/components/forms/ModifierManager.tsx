@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import type { MenuItem } from '../../types';
+import { API_URL } from '../../config';
 
 interface ModifierManagerProps {
   item: MenuItem;
@@ -22,7 +23,7 @@ const ModifierManager = ({ item, onUpdate }: ModifierManagerProps) => {
     if (!newModifier.name) return;
     setLoading(true);
     try {
-      await axios.post(`http://localhost:8080/api/menu/modifiers`, {
+      await axios.post(`${API_URL}/menu/modifiers`, {
         menu_item_id: item.ID,
         ...newModifier
       });
@@ -39,7 +40,7 @@ const ModifierManager = ({ item, onUpdate }: ModifierManagerProps) => {
     if (!newOption.name) return;
     setLoading(true);
     try {
-      await axios.post(`http://localhost:8080/api/menu/options`, {
+      await axios.post(`${API_URL}/menu/options`, {
         modifier_id: modifierId,
         ...newOption
       });
