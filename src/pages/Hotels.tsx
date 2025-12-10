@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, MapPin, Building2, ArrowLeft } from 'lucide-react';
+import { Plus, MapPin, Building2, ArrowLeft, X } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { useHotel } from '../context/HotelContext';
 import { API_URL } from '../config';
@@ -10,6 +10,7 @@ interface Hotel {
   name: string;
   address: string;
   description: string;
+  facilities: string;
   image_url: string;
 }
 
@@ -18,7 +19,9 @@ const Hotels = () => {
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'create'>('list');
-  const [newHotel, setNewHotel] = useState({ name: '', address: '', description: '', image_url: '' });
+  const [newHotel, setNewHotel] = useState({ name: '', address: '', description: '', image_url: '', facilities: '[]' });
+  const [facilitiesList, setFacilitiesList] = useState<string[]>([]);
+  const [facilityInput, setFacilityInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -36,12 +39,28 @@ const Hotels = () => {
     }
   };
 
+  const addFacility = () => {
+    if (facilityInput.trim()) {
+      const updated = [...facilitiesList, facilityInput.trim()];
+      setFacilitiesList(updated);
+      setNewHotel({...newHotel, facilities: JSON.stringify(updated)});
+      setFacilityInput('');
+    }
+  };
+
+  const removeFacility = (index: number) => {
+    const updated = facilitiesList.filter((_, i) => i !== index);
+    setFacilitiesList(updated);
+    setNewHotel({...newHotel, facilities: JSON.stringify(updated)});
+  };
+
   const handleAddHotel = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     try {
       await axios.post(`${API_URL}/hotels`, newHotel);
-      setNewHotel({ name: '', address: '', description: '', image_url: '' });
+      setNewHotel({ name: '', address: '', description: '', image_url: '', facilities: '[]' });
+      setFacilitiesList([]);
       setView('list');
       loadHotels();
       fetchHotels(); // Refresh global context
@@ -109,6 +128,45 @@ const Hotels = () => {
                 rows={4}
                 placeholder="Brief description of the property..."
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Facilities</label>
+              <div className="flex gap-2 mb-3">
+                <input 
+                  type="text" 
+                  className="flex-1 border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
+                  value={facilityInput}
+                  onChange={(e) => setFacilityInput(e.target.value)}
+                  placeholder="Add facility (e.g. Swimming Pool)"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addFacility();
+                    }
+                  }}
+                />
+                <button 
+                  type="button"
+                  onClick={addFacility}
+                  className="bg-gray-100 text-gray-700 px-4 rounded-lg hover:bg-gray-200 font-medium"
+                >
+                  Add
+                </button>
+              </div>
+              
+              {facilitiesList.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {facilitiesList.map((f, i) => (
+                    <span key={i} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm flex items-center gap-1 border border-blue-100">
+                      {f}
+                      <button type="button" onClick={() => removeFacility(i)} className="hover:text-blue-900">
+                        <X size={14} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
