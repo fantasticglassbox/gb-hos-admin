@@ -30,8 +30,19 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const response = await axios.get(`${API_URL}/hotels`);
       setHotels(response.data);
       
-      // Restore selection or default to first
+      const userRole = localStorage.getItem('userRole');
       const savedId = localStorage.getItem('selectedHotelId');
+      
+      // For hotel_admin, use the hotel_id from login response
+      if (userRole === 'hotel_admin' && savedId) {
+        const found = response.data.find((h: Hotel) => h.ID === Number(savedId));
+        if (found) {
+          setSelectedHotelState(found);
+          return; // Don't proceed with default selection
+        }
+      }
+      
+      // Restore selection or default to first
       if (savedId) {
         const found = response.data.find((h: Hotel) => h.ID === Number(savedId));
         if (found) setSelectedHotelState(found);

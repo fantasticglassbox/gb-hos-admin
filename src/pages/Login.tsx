@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import { Lock, Mail } from 'lucide-react';
-import { API_URL } from '../config';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -17,12 +16,19 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await axios.post(`${API_URL}/login`, {
+      const response = await api.post('/login', {
         email,
         password
       });
       
       localStorage.setItem('token', response.data.token);
+      localStorage.setItem('userRole', response.data.role);
+      
+      // If hotel_admin, automatically set the hotel_id
+      if (response.data.skip_hotel_selection && response.data.hotel_id) {
+        localStorage.setItem('selectedHotelId', response.data.hotel_id.toString());
+      }
+      
       navigate('/');
     } catch (err) {
       setError('Invalid email or password');

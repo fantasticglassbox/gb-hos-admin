@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { HotelProvider } from './context/HotelContext';
 import DashboardLayout from './layouts/DashboardLayout';
 import Dashboard from './pages/Dashboard';
@@ -8,6 +8,7 @@ import Orders from './pages/Orders';
 import Ads from './pages/Ads';
 import Hotels from './pages/Hotels';
 import Devices from './pages/Devices';
+import Users from './pages/Users';
 import Login from './pages/Login';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -18,12 +19,28 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+  const token = localStorage.getItem('token');
+  // If user is already logged in, redirect to dashboard
+  if (token) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+};
+
 function App() {
   return (
     <BrowserRouter>
       <HotelProvider>
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route 
+            path="/login" 
+            element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            } 
+          />
           
           <Route path="/" element={
             <ProtectedRoute>
@@ -33,11 +50,15 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="hotels" element={<Hotels />} />
             <Route path="devices" element={<Devices />} />
+            <Route path="users" element={<Users />} />
             <Route path="services" element={<Services />} />
             <Route path="services/:id" element={<ServiceDetail />} />
             <Route path="orders" element={<Orders />} />
             <Route path="ads" element={<Ads />} />
           </Route>
+          
+          {/* Catch all - redirect to login if route not found */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </HotelProvider>
     </BrowserRouter>

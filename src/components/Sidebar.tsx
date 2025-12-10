@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, ShoppingBag, Utensils, Settings, LogOut, MonitorPlay, Building2, Smartphone, ChevronDown, Search, Check } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Utensils, Settings, LogOut, MonitorPlay, Building2, Smartphone, Users, ChevronDown, Search, Check } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useHotel } from '../context/HotelContext';
 import logo from '../assets/logo.png';
@@ -32,6 +32,7 @@ const Sidebar = () => {
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
     { icon: Building2, label: 'Hotels', path: '/hotels' },
     { icon: Smartphone, label: 'Devices', path: '/devices' },
+    { icon: Users, label: 'Users', path: '/users' },
     { icon: Utensils, label: 'Services', path: '/services' },
     { icon: ShoppingBag, label: 'Orders', path: '/orders' },
     { icon: MonitorPlay, label: 'Ads & Promos', path: '/ads' },
@@ -40,6 +41,8 @@ const Sidebar = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('selectedHotelId');
     navigate('/login');
   };
 
