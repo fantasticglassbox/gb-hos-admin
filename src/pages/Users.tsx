@@ -19,7 +19,7 @@ interface Hotel {
 }
 
 const Users = () => {
-  const { selectedHotel, hotels } = useHotel();
+  const { selectedHotel } = useHotel();
   const [users, setUsers] = useState<User[]>([]);
   const [hotelsList, setHotelsList] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
