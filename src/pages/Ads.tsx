@@ -88,7 +88,7 @@ const Ads = () => {
   const handleDeleteAd = async (id: number) => {
     if (!confirm('Are you sure you want to delete this ad?')) return;
     try {
-      await axios.delete(`${API_URL}/ads/${id}`);
+      await api.delete(`/ads/${id}`);
       fetchAds();
     } catch (error) {
       console.error('Error deleting ad:', error);

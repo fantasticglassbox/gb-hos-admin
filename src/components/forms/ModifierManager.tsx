@@ -39,7 +39,7 @@ const ModifierManager = ({ item, onUpdate }: ModifierManagerProps) => {
     if (!newOption.name) return;
     setLoading(true);
     try {
-      await axios.post(`${API_URL}/menu/options`, {
+      await api.post('/menu/options', {
         modifier_id: modifierId,
         ...newOption
       });
