@@ -9,6 +9,8 @@ import Ads from './pages/Ads';
 import Hotels from './pages/Hotels';
 import Devices from './pages/Devices';
 import Users from './pages/Users';
+import Facilities from './pages/Facilities';
+import Rooms from './pages/Rooms';
 import Login from './pages/Login';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -55,6 +57,8 @@ function App() {
             <Route path="services/:id" element={<ServiceDetail />} />
             <Route path="orders" element={<Orders />} />
             <Route path="ads" element={<Ads />} />
+            <Route path="facilities" element={<Facilities />} />
+            <Route path="rooms" element={<Rooms />} />
           </Route>
           
           {/* Catch all - redirect to login if route not found */}

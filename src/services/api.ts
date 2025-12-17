@@ -9,13 +9,44 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token and hotel_id for hotel_admin
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // For hotel_admin, automatically add hotel_id to query params if not already present
+    const userRole = localStorage.getItem('userRole');
+    if (userRole === 'hotel_admin') {
+      const selectedHotelId = localStorage.getItem('selectedHotelId');
+      if (selectedHotelId && config.url) {
+        // Skip adding hotel_id for these endpoints
+        const skipEndpoints = ['/login', '/hotels', '/health'];
+        const shouldSkip = skipEndpoints.some(endpoint => config.url?.includes(endpoint));
+        
+        if (!shouldSkip) {
+          // Check if hotel_id is already in the URL
+          const urlHasHotelId = config.url.includes('hotel_id=');
+          
+          // Check if hotel_id is already in params object
+          const paramsHasHotelId = config.params && typeof config.params === 'object' && 'hotel_id' in config.params;
+          
+          if (!urlHasHotelId && !paramsHasHotelId) {
+            // Prefer using params object if it exists, otherwise append to URL
+            if (config.params && typeof config.params === 'object') {
+              config.params = { ...config.params, hotel_id: selectedHotelId };
+            } else {
+              // Add hotel_id to query params in URL
+              const separator = config.url.includes('?') ? '&' : '?';
+              config.url = `${config.url}${separator}hotel_id=${selectedHotelId}`;
+            }
+          }
+        }
+      }
+    }
+
     return config;
   },
   (error) => {

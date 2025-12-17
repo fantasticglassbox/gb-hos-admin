@@ -24,8 +24,8 @@ const Login = () => {
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('userRole', response.data.role);
       
-      // If hotel_admin, automatically set the hotel_id
-      if (response.data.skip_hotel_selection && response.data.hotel_id) {
+      // If hotel_admin, automatically set the hotel_id from login response
+      if (response.data.role === 'hotel_admin' && response.data.hotel_id) {
         localStorage.setItem('selectedHotelId', response.data.hotel_id.toString());
       }
       

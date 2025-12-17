@@ -1,6 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import axios from 'axios';
-import { API_URL } from '../config';
+import api from '../services/api';
 
 interface Hotel {
   ID: number;
@@ -11,6 +10,7 @@ interface HotelContextType {
   selectedHotel: Hotel | null;
   hotels: Hotel[];
   setSelectedHotel: (hotel: Hotel) => void;
+  clearSelectedHotel: () => void;
   fetchHotels: () => Promise<void>;
 }
 
@@ -25,9 +25,14 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('selectedHotelId', hotel.ID.toString());
   };
 
+  const clearSelectedHotel = () => {
+    setSelectedHotelState(null);
+    localStorage.removeItem('selectedHotelId');
+  };
+
   const fetchHotels = async () => {
     try {
-      const response = await axios.get(`${API_URL}/hotels`);
+      const response = await api.get('/hotels');
       setHotels(response.data);
       
       const userRole = localStorage.getItem('userRole');
@@ -60,7 +65,7 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   return (
-    <HotelContext.Provider value={{ selectedHotel, hotels, setSelectedHotel, fetchHotels }}>
+    <HotelContext.Provider value={{ selectedHotel, hotels, setSelectedHotel, clearSelectedHotel, fetchHotels }}>
       {children}
     </HotelContext.Provider>
   );

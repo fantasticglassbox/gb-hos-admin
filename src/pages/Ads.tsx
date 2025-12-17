@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { Plus, Trash2, ArrowLeft, Image as ImageIcon, Video } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { useHotel } from '../context/HotelContext';
-import { API_URL } from '../config';
 
 interface Ad {
   ID: number;
@@ -43,7 +42,10 @@ const Ads = () => {
   const fetchAds = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/ads`);
+      const url = selectedHotel 
+        ? `/ads?hotel_id=${selectedHotel.ID}` 
+        : '/ads';
+      const response = await api.get(url);
       setAds(response.data);
     } catch (error) {
       console.error('Error fetching ads:', error);
@@ -72,7 +74,7 @@ const Ads = () => {
         adData.end_date = newAd.end_date;
       }
       
-      await axios.post(`${API_URL}/ads`, adData);
+      await api.post('/ads', adData);
       setNewAd({ title: '', description: '', image_url: '', duration_seconds: 10, start_date: '', end_date: '' });
       setView('list');
       fetchAds();

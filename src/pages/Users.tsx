@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { Plus, Users as UsersIcon, Edit2, Trash2, ArrowLeft, Shield, UserCheck, UserCog, User } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
-import { API_URL } from '../config';
 
 interface User {
   ID: number;
@@ -44,7 +43,7 @@ const Users = () => {
 
   const loadHotels = async () => {
     try {
-      const response = await axios.get(`${API_URL}/hotels`);
+      const response = await api.get('/hotels');
       setHotelsList(response.data);
     } catch (error) {
       console.error('Error fetching hotels:', error);
@@ -54,13 +53,13 @@ const Users = () => {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      let url = `${API_URL}/users`;
+      let url = '/users';
       const params = new URLSearchParams();
       if (filterRole) params.append('role', filterRole);
       if (filterHotel) params.append('hotel_id', filterHotel);
       if (params.toString()) url += '?' + params.toString();
       
-      const response = await axios.get(url);
+      const response = await api.get(url);
       setUsers(response.data);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -89,14 +88,14 @@ const Users = () => {
       }
       
       if (editingUser) {
-        await axios.put(`${API_URL}/users/${editingUser.ID}`, payload);
+        await api.put(`/users/${editingUser.ID}`, payload);
       } else {
         if (!formData.password) {
           alert('Password is required for new users');
           setSubmitting(false);
           return;
         }
-        await axios.post(`${API_URL}/users`, payload);
+        await api.post(`/users`, payload);
       }
       
       resetForm();
@@ -127,7 +126,7 @@ const Users = () => {
     if (!confirm(`Are you sure you want to delete ${user.name}?`)) return;
     
     try {
-      await axios.delete(`${API_URL}/users/${user.ID}`);
+      await api.delete(`/users/${user.ID}`);
       loadUsers();
     } catch (error: any) {
       console.error('Error deleting user:', error);

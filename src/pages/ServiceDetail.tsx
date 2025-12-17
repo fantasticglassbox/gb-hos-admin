@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import { Plus, Settings, Search, Filter } from 'lucide-react';
 
 import type { Service, MenuItem, MenuCategory } from '../types';
@@ -8,7 +8,6 @@ import Modal from '../components/Modal';
 import CategoryForm from '../components/forms/CategoryForm';
 import MenuItemForm from '../components/forms/MenuItemForm';
 import ModifierManager from '../components/forms/ModifierManager';
-import { API_URL } from '../config';
 
 const ServiceDetail = () => {
   const { id } = useParams();
@@ -39,7 +38,7 @@ const ServiceDetail = () => {
 
   const fetchService = async () => {
     try {
-      const response = await axios.get(`${API_URL}/services/${id}`);
+      const response = await api.get(`/services/${id}`);
       setService(response.data);
       
       // Refresh active modifier item if open

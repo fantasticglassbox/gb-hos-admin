@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { Plus, MapPin, Building2, ArrowLeft, X } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { useHotel } from '../context/HotelContext';
-import { API_URL } from '../config';
 
 interface Hotel {
   ID: number;
@@ -30,7 +29,7 @@ const Hotels = () => {
 
   const loadHotels = async () => {
     try {
-      const response = await axios.get(`${API_URL}/hotels`);
+      const response = await api.get('/hotels');
       setHotels(response.data);
     } catch (error) {
       console.error('Error fetching hotels:', error);
@@ -58,7 +57,7 @@ const Hotels = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await axios.post(`${API_URL}/hotels`, newHotel);
+      await api.post('/hotels', newHotel);
       setNewHotel({ name: '', address: '', description: '', image_url: '', facilities: '[]' });
       setFacilitiesList([]);
       setView('list');
