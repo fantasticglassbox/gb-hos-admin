@@ -47,14 +47,13 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       }
       
-      // Restore selection or default to first
+      // Restore selection or default to all (null)
       if (savedId) {
         const found = response.data.find((h: Hotel) => h.ID === Number(savedId));
         if (found) setSelectedHotelState(found);
-        else if (response.data.length > 0) setSelectedHotelState(response.data[0]);
-      } else if (response.data.length > 0) {
-        setSelectedHotelState(response.data[0]);
+        // If saved hotel not found, default to all (null) instead of first hotel
       }
+      // If no savedId, keep selectedHotel as null (all hotels)
     } catch (error) {
       console.error('Failed to fetch hotels', error);
     }

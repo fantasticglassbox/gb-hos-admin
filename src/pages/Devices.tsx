@@ -3,18 +3,19 @@ import api from '../services/api';
 import { Monitor, Plus, Trash2, Smartphone, CheckCircle, AlertCircle } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
 import Modal from '../components/Modal';
-import type { Device } from '../types';
+import type { Device, Room } from '../types';
 
 const Devices = () => {
   const { selectedHotel, hotels } = useHotel();
   const [devices, setDevices] = useState<Device[]>([]);
   const [pendingDevices, setPendingDevices] = useState<Device[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Form State
   const [showModal, setShowModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [newDevice, setNewDevice] = useState({ name: '', room_number: '' });
+  const [newDevice, setNewDevice] = useState({ name: '', room_id: 0 });
   const [selectedPendingDevice, setSelectedPendingDevice] = useState<Device | null>(null);
   const [creating, setCreating] = useState(false);
   const [assignHotelId, setAssignHotelId] = useState<number | null>(null);
@@ -22,7 +23,27 @@ const Devices = () => {
   useEffect(() => {
     fetchDevices();
     fetchPendingDevices();
+    if (selectedHotel) {
+      fetchRooms(selectedHotel.ID);
+    }
   }, [selectedHotel]);
+
+  // Fetch rooms when assignHotelId changes (for assign modal without selectedHotel)
+  useEffect(() => {
+    if (assignHotelId && !selectedHotel) {
+      fetchRooms(assignHotelId);
+    }
+  }, [assignHotelId]);
+
+  const fetchRooms = async (hotelId: number) => {
+    try {
+      const response = await api.get(`/rooms?hotel_id=${hotelId}`);
+      setRooms(response.data || []);
+    } catch (error) {
+      console.error('Error fetching rooms:', error);
+      setRooms([]);
+    }
+  };
 
   const fetchDevices = async () => {
     setLoading(true);
@@ -63,7 +84,7 @@ const Devices = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDevice.name || !newDevice.room_number) return;
+    if (!newDevice.name || !newDevice.room_id) return;
     if (!selectedHotel) {
       alert('Please select a hotel to create a device');
       return;
@@ -73,9 +94,10 @@ const Devices = () => {
     try {
       await api.post('/devices', {
         hotel_id: selectedHotel.ID,
-        ...newDevice
+        room_id: newDevice.room_id,
+        name: newDevice.name
       });
-      setNewDevice({ name: '', room_number: '' });
+      setNewDevice({ name: '', room_id: 0 });
       setShowModal(false);
       fetchDevices();
     } catch (error) {
@@ -88,7 +110,7 @@ const Devices = () => {
 
   const handleAssign = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPendingDevice || !newDevice.name || !newDevice.room_number) return;
+    if (!selectedPendingDevice || !newDevice.name || !newDevice.room_id) return;
     
     const hotelIdToUse = selectedHotel?.ID || assignHotelId;
     if (!hotelIdToUse) {
@@ -101,10 +123,10 @@ const Devices = () => {
       await api.put(`/devices/${selectedPendingDevice.ID}`, {
         hotel_id: hotelIdToUse,
         name: newDevice.name,
-        room_number: newDevice.room_number,
+        room_id: newDevice.room_id,
         status: 'Active'
       });
-      setNewDevice({ name: '', room_number: '' });
+      setNewDevice({ name: '', room_id: 0 });
       setSelectedPendingDevice(null);
       setAssignHotelId(null);
       setShowAssignModal(false);
@@ -120,7 +142,7 @@ const Devices = () => {
 
   const openAssignModal = (device: Device) => {
     setSelectedPendingDevice(device);
-    setNewDevice({ name: device.name || 'New Device', room_number: '' });
+    setNewDevice({ name: device.name || 'New Device', room_id: 0 });
     setAssignHotelId(selectedHotel?.ID || null);
     setShowAssignModal(true);
   };
@@ -223,7 +245,7 @@ const Devices = () => {
                 </div>
                 
                 <h3 className="font-bold text-gray-900 text-lg">{device.name}</h3>
-                <p className="text-gray-500 text-sm mb-4">Room {device.room_number}</p>
+                <p className="text-gray-500 text-sm mb-4">Room {device.room?.number || 'N/A'}</p>
                 
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-xs text-gray-400">UUID:</span>
@@ -260,15 +282,23 @@ const Devices = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Room Number</label>
-            <input 
-              type="text" 
+            <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Room</label>
+            <select
               required
-              placeholder="e.g. 101"
+              value={newDevice.room_id || ''}
+              onChange={(e) => setNewDevice({...newDevice, room_id: Number(e.target.value)})}
               className="w-full border p-2 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
-              value={newDevice.room_number}
-              onChange={(e) => setNewDevice({...newDevice, room_number: e.target.value})}
-            />
+            >
+              <option value="">-- Select a room --</option>
+              {rooms.map((room) => (
+                <option key={room.ID} value={room.ID}>
+                  Room {room.number} ({room.type})
+                </option>
+              ))}
+            </select>
+            {rooms.length === 0 && (
+              <p className="text-xs text-gray-500 mt-1">No rooms available. Create rooms first.</p>
+            )}
           </div>
           
           <div className="flex justify-end gap-2 pt-4">
@@ -281,7 +311,7 @@ const Devices = () => {
             </button>
             <button 
               type="submit" 
-              disabled={creating}
+              disabled={creating || rooms.length === 0}
               className="px-6 py-2 bg-[#008491] text-white rounded-lg hover:bg-[#006a76] disabled:opacity-50"
             >
               {creating ? 'Registering...' : 'Register Device'}
@@ -306,7 +336,11 @@ const Devices = () => {
               <select
                 required
                 value={assignHotelId || ''}
-                onChange={(e) => setAssignHotelId(Number(e.target.value))}
+                onChange={(e) => {
+                  const hotelId = Number(e.target.value);
+                  setAssignHotelId(hotelId);
+                  setNewDevice({...newDevice, room_id: 0}); // Reset room selection
+                }}
                 className="w-full border p-2 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
               >
                 <option value="">-- Select a hotel --</option>
@@ -330,15 +364,24 @@ const Devices = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Room Number</label>
-            <input 
-              type="text" 
+            <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Room</label>
+            <select
               required
-              placeholder="e.g. 101"
+              value={newDevice.room_id || ''}
+              onChange={(e) => setNewDevice({...newDevice, room_id: Number(e.target.value)})}
               className="w-full border p-2 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
-              value={newDevice.room_number}
-              onChange={(e) => setNewDevice({...newDevice, room_number: e.target.value})}
-            />
+              disabled={!selectedHotel && !assignHotelId}
+            >
+              <option value="">-- Select a room --</option>
+              {rooms.map((room) => (
+                <option key={room.ID} value={room.ID}>
+                  Room {room.number} ({room.type})
+                </option>
+              ))}
+            </select>
+            {(selectedHotel || assignHotelId) && rooms.length === 0 && (
+              <p className="text-xs text-gray-500 mt-1">No rooms available. Create rooms first.</p>
+            )}
           </div>
           
           <div className="flex justify-end gap-2 pt-4">
@@ -351,7 +394,7 @@ const Devices = () => {
             </button>
             <button 
               type="submit" 
-              disabled={creating || (!selectedHotel && !assignHotelId)}
+              disabled={creating || (!selectedHotel && !assignHotelId) || !newDevice.room_id}
               className="px-6 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {creating ? 'Assigning...' : 'Confirm Assignment'}

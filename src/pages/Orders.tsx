@@ -181,27 +181,29 @@ const Orders = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xl font-bold text-gray-900">Rp {order.total_amount.toLocaleString()}</div>
+                  <div className="text-xl font-bold text-gray-900">Rp {order.total_amount.toLocaleString('id-ID')}</div>
                 </div>
               </div>
 
               <div className="space-y-3 mb-4">
                 {order.items.map((item) => (
                   <div key={item.ID} className="border-b border-gray-100 pb-3 last:border-b-0">
-                    <div className="flex justify-between items-start mb-1">
-                      <div className="flex gap-2 items-start">
-                        <span className="font-semibold text-gray-900 text-sm">{item.quantity}x</span>
-                        <div className="flex-1">
-                          <span className="text-gray-900 font-medium text-sm">{item.service.name}</span>
+                    <div className="flex justify-between items-start">
+                      <div className="flex gap-3 items-start flex-1">
+                        <div className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded-lg shrink-0">
+                          <span className="font-bold text-gray-900 text-xs">{item.quantity}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-gray-900 font-semibold text-sm mb-1">{item.service.name}</div>
                           {item.modifier_options && item.modifier_options.length > 0 && (
                             <div className="mt-1.5 ml-0 space-y-0.5">
                               {item.modifier_options.map((option) => (
                                 <div key={option.ID} className="text-xs text-gray-600 flex items-center gap-1.5">
                                   <span className="text-gray-400">•</span>
-                                  <span>{option.name}</span>
+                                  <span className="flex-1">{option.name}</span>
                                   {option.price_delta !== 0 && (
-                                    <span className={`font-medium ${option.price_delta > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                      ({option.price_delta > 0 ? '+' : ''}Rp {Math.abs(option.price_delta).toLocaleString()})
+                                    <span className={`font-medium whitespace-nowrap ${option.price_delta > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      {option.price_delta > 0 ? '+' : ''}Rp {Math.abs(option.price_delta).toLocaleString('id-ID')}
                                     </span>
                                   )}
                                 </div>
@@ -215,9 +217,11 @@ const Orders = () => {
                           )}
                         </div>
                       </div>
-                      <span className="text-gray-900 font-semibold text-sm whitespace-nowrap ml-4">
-                        Rp {(item.price * item.quantity).toLocaleString()}
-                      </span>
+                      <div className="text-right ml-4 shrink-0">
+                        <div className="text-gray-900 font-bold text-sm whitespace-nowrap">
+                          Rp {(item.price * item.quantity).toLocaleString('id-ID')}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}

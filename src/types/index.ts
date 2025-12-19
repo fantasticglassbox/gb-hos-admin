@@ -32,14 +32,16 @@ export interface Service {
   ID: number;
   name: string;
   type: string;
+  image_url?: string;
   categories: MenuCategory[];
 }
 
 export interface Device {
   ID: number;
   hotel_id: number;
+  room_id: number;
+  room?: Room;
   name: string;
-  room_number: string;
   status: string;
   fcm_token?: string;
   uuid?: string;
@@ -63,4 +65,14 @@ export interface Room {
   price: number;
   floor_no: number;
   status: string; // available, occupied, maintenance
+}
+
+export interface HotelSetting {
+  ID: number;
+  hotel_id: number;
+  app_background_image: string;
+  localization?: string; // JSON string for localization (ID, EN, ZH)
+  default_layout?: string; // "list" or "grid"
+  no_item_section?: number; // Number of items per section for grid layout
+  display_size?: string; // "normal", "large", "extra_large" - Controls UI scaling for accessibility
 }

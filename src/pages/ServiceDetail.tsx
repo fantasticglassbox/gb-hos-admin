@@ -8,6 +8,7 @@ import Modal from '../components/Modal';
 import CategoryForm from '../components/forms/CategoryForm';
 import MenuItemForm from '../components/forms/MenuItemForm';
 import ModifierManager from '../components/forms/ModifierManager';
+import ImageUpload from '../components/ImageUpload';
 
 const ServiceDetail = () => {
   const { id } = useParams();
@@ -20,6 +21,9 @@ const ServiceDetail = () => {
   const [showItemModal, setShowItemModal] = useState(false);
   const [activeCategory, setActiveCategory] = useState<number | undefined>(undefined);
   const [activeModifierItem, setActiveModifierItem] = useState<MenuItem | null>(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [serviceImageUrl, setServiceImageUrl] = useState('');
+  const [savingImage, setSavingImage] = useState(false);
 
   // Filter & Pagination States
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,6 +44,7 @@ const ServiceDetail = () => {
     try {
       const response = await api.get(`/services/${id}`);
       setService(response.data);
+      setServiceImageUrl(response.data.image_url || '');
       
       // Refresh active modifier item if open
       if (activeModifierItem) {
@@ -53,6 +58,23 @@ const ServiceDetail = () => {
       console.error('Error fetching service:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveServiceImage = async () => {
+    if (!service) return;
+    setSavingImage(true);
+    try {
+      await api.put(`/services/${service.ID}`, {
+        image_url: serviceImageUrl,
+      });
+      await fetchService();
+      setShowSettingsModal(false);
+    } catch (error) {
+      console.error('Error saving service image:', error);
+      alert('Failed to save service image');
+    } finally {
+      setSavingImage(false);
     }
   };
 
@@ -111,6 +133,12 @@ const ServiceDetail = () => {
         </div>
         
         <div className="flex gap-3">
+          <button 
+            onClick={() => setShowSettingsModal(true)}
+            className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 hover:border-gray-300 flex items-center gap-2 transition-all shadow-sm"
+          >
+            <Settings size={18} /> Settings
+          </button>
           <button 
             onClick={() => setShowCatModal(true)}
             className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 hover:border-gray-300 flex items-center gap-2 transition-all shadow-sm"
@@ -291,6 +319,68 @@ const ServiceDetail = () => {
             onClose={() => setActiveModifierItem(null)}
           />
         )}
+      </Modal>
+
+      <Modal 
+        isOpen={showSettingsModal} 
+        onClose={() => setShowSettingsModal(false)} 
+        title="Service Settings"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Service Image
+            </label>
+            <p className="text-xs text-gray-500 mb-3">
+              Upload an image for this service. If not provided, the app will use a default gradient design.
+            </p>
+            {serviceImageUrl && (
+              <div className="mb-3 relative">
+                <div className="w-full h-48 rounded-lg overflow-hidden border border-gray-200">
+                  <img
+                    src={serviceImageUrl}
+                    alt="Service preview"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setServiceImageUrl('')}
+                  className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-600 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+            <div className="border-2 border-dashed border-gray-200 rounded-lg p-4">
+              <ImageUpload
+                value={serviceImageUrl}
+                onChange={(url) => setServiceImageUrl(url)}
+                label={serviceImageUrl ? "Change Image" : "Upload Service Image"}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => setShowSettingsModal(false)}
+              className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveServiceImage}
+              disabled={savingImage}
+              className="px-4 py-2 bg-[#008491] text-white hover:bg-[#006a76] rounded-lg font-medium shadow-md shadow-gray-200 disabled:opacity-70 transition-all"
+            >
+              {savingImage ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
       </Modal>
 
     </div>

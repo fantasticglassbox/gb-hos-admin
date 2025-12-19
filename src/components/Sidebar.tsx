@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, ShoppingBag, Utensils, Settings, LogOut, MonitorPlay, Building2, Smartphone, Users, ChevronDown, Search, Check, Dumbbell, DoorOpen } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, Utensils, Settings, LogOut, MonitorPlay, Building2, Smartphone, Users, ChevronDown, Search, Check, Dumbbell, DoorOpen, Sliders } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useHotel } from '../context/HotelContext';
 import logo from '../assets/logo.png';
@@ -40,6 +40,7 @@ const Sidebar = () => {
     { icon: ShoppingBag, label: 'Orders', path: '/orders' },
     { icon: MonitorPlay, label: 'Ads & Promos', path: '/ads' },
     { icon: Dumbbell, label: 'Facilities', path: '/facilities' },
+    { icon: Sliders, label: 'Hotel Settings', path: '/hotel-settings' },
     { icon: Settings, label: 'Settings', path: '/settings' },
   ];
 
