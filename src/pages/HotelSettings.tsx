@@ -3,11 +3,9 @@ import api from '../services/api';
 import { Save, Image as ImageIcon, AlertCircle, Globe, Layout, Type } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { useHotel } from '../context/HotelContext';
-import type { HotelSetting } from '../types';
 
 const HotelSettings = () => {
   const { selectedHotel } = useHotel();
-  const [setting, setSetting] = useState<HotelSetting | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -26,8 +24,13 @@ const HotelSettings = () => {
       fetchHotelSetting();
     } else {
       setLoading(false);
-      setSetting(null);
-      setFormData({ app_background_image: '' });
+      setFormData({
+        app_background_image: '',
+        localization: '',
+        default_layout: 'list',
+        no_item_section: 2,
+        display_size: 'normal',
+      });
     }
   }, [selectedHotel]);
 
@@ -37,7 +40,6 @@ const HotelSettings = () => {
     setLoading(true);
     try {
       const response = await api.get(`/hotel-settings/by-hotel/${selectedHotel.ID}`);
-      setSetting(response.data);
       setFormData({
         app_background_image: response.data.app_background_image || '',
         localization: response.data.localization || '',
@@ -48,7 +50,6 @@ const HotelSettings = () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         // No settings yet for this hotel - that's fine
-        setSetting(null);
         setFormData({ 
           app_background_image: '',
           localization: '',
