@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { LayoutDashboard, ShoppingBag, Utensils, Settings, LogOut, MonitorPlay, Building2, Smartphone, Users, ChevronDown, Search, Check, Dumbbell, DoorOpen, Sliders } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useHotel } from '../context/HotelContext';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.svg';
 
 const Sidebar = () => {
   const location = useLocation();
@@ -59,9 +59,11 @@ const Sidebar = () => {
   return (
     <div className="h-screen w-64 bg-white border-r border-gray-200 flex flex-col fixed left-0 top-0 z-50 shadow-lg">
       <div className="p-6 border-b border-gray-100 relative z-20">
-        <div className="flex items-center gap-3 mb-6">
-          <img src={logo} alt="Glassbox" className="h-8 w-auto" />
+        <div className="flex items-center">
+          <img src={logo} alt="Glassbox" className="h-20 w-64" />
         </div>
+        
+        <div className="border-t border-gray-200 my-4"></div>
         
         {/* Hotel Selector or Welcome Label */}
         {isHotelAdmin ? (

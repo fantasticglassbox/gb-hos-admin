@@ -72,6 +72,7 @@ export interface HotelSetting {
   hotel_id: number;
   app_background_image: string;
   localization?: string; // JSON string for localization (ID, EN, ZH)
+  default_lang?: string; // Default language: "ID", "EN", or "ZH"
   default_layout?: string; // "list" or "grid"
   no_item_section?: number; // Number of items per section for grid layout
   display_size?: string; // "normal", "large", "extra_large" - Controls UI scaling for accessibility

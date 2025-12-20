@@ -14,6 +14,7 @@ const HotelSettings = () => {
   const [formData, setFormData] = useState({
     app_background_image: '',
     localization: '',
+    default_lang: 'EN',
     default_layout: 'list',
     no_item_section: 2,
     display_size: 'normal',
@@ -27,6 +28,7 @@ const HotelSettings = () => {
       setFormData({
         app_background_image: '',
         localization: '',
+        default_lang: 'EN',
         default_layout: 'list',
         no_item_section: 2,
         display_size: 'normal',
@@ -43,6 +45,7 @@ const HotelSettings = () => {
       setFormData({
         app_background_image: response.data.app_background_image || '',
         localization: response.data.localization || '',
+        default_lang: response.data.default_lang || 'EN',
         default_layout: response.data.default_layout || 'list',
         no_item_section: response.data.no_item_section || 2,
         display_size: response.data.display_size || 'normal',
@@ -53,6 +56,7 @@ const HotelSettings = () => {
         setFormData({ 
           app_background_image: '',
           localization: '',
+          default_lang: 'EN',
           default_layout: 'list',
           no_item_section: 2,
           display_size: 'normal',
@@ -80,6 +84,7 @@ const HotelSettings = () => {
         hotel_id: selectedHotel.ID,
         app_background_image: formData.app_background_image,
         localization: formData.localization,
+        default_lang: formData.default_lang,
         default_layout: formData.default_layout,
         no_item_section: formData.no_item_section,
         display_size: formData.display_size,
@@ -200,23 +205,46 @@ const HotelSettings = () => {
               Localization
             </h2>
             <p className="text-sm text-gray-600 mb-4">
-              Configure translations for Bahasa (ID), English (default), and Chinese. 
+              Configure translations for Bahasa (ID), English (EN), and Chinese (ZH). 
               Provide JSON format with language codes as keys.
             </p>
             
             <div className="space-y-4">
-              <textarea
-                value={formData.localization}
-                onChange={(e) => setFormData({ ...formData, localization: e.target.value })}
-                placeholder='{"id": {"key": "value"}, "en": {"key": "value"}, "zh": {"key": "value"}}'
-                className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-[#008491] focus:border-[#008491] resize-none"
-              />
-              <p className="text-xs text-gray-500">
-                Enter valid JSON format. Example:{' '}
-                <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">
-                  {`{"id": {"welcome": "Selamat Datang"}, "en": {"welcome": "Welcome"}, "zh": {"welcome": "??"}}`}
-                </code>
-              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Default Language
+                </label>
+                <select
+                  value={formData.default_lang}
+                  onChange={(e) => setFormData({ ...formData, default_lang: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#008491] focus:border-[#008491]"
+                >
+                  <option value="EN">English (EN)</option>
+                  <option value="ID">Bahasa Indonesia (ID)</option>
+                  <option value="ZH">Chinese (ZH)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  The default language that will be used when the app first loads. Users can change it later.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Translation JSON
+                </label>
+                <textarea
+                  value={formData.localization}
+                  onChange={(e) => setFormData({ ...formData, localization: e.target.value })}
+                  placeholder='{"ID": {"key": "value"}, "EN": {"key": "value"}, "ZH": {"key": "value"}}'
+                  className="w-full h-64 p-4 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-[#008491] focus:border-[#008491] resize-none"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter valid JSON format. Use uppercase language codes (ID, EN, ZH). Example:{' '}
+                  <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">
+                    {`{"ID": {"welcome": "Selamat Datang"}, "EN": {"welcome": "Welcome"}, "ZH": {"welcome": "欢迎"}}`}
+                  </code>
+                </p>
+              </div>
             </div>
           </div>
 
