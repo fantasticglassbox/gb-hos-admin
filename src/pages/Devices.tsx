@@ -23,21 +23,23 @@ const Devices = () => {
   useEffect(() => {
     fetchDevices();
     fetchPendingDevices();
-    if (selectedHotel) {
-      fetchRooms(selectedHotel.ID);
-    }
+    // Don't fetch rooms here - only fetch when needed for device assignment
   }, [selectedHotel]);
 
   // Fetch rooms when assignHotelId changes (for assign modal without selectedHotel)
   useEffect(() => {
     if (assignHotelId && !selectedHotel) {
-      fetchRooms(assignHotelId);
+      fetchRooms(assignHotelId, true); // Only show rooms available for device assignment
     }
   }, [assignHotelId]);
 
-  const fetchRooms = async (hotelId: number) => {
+  const fetchRooms = async (hotelId: number, availableForDevice: boolean = false) => {
     try {
-      const response = await api.get(`/rooms?hotel_id=${hotelId}`);
+      const params = new URLSearchParams({ hotel_id: hotelId.toString() });
+      if (availableForDevice) {
+        params.append('available_for_device', 'true');
+      }
+      const response = await api.get(`/rooms?${params.toString()}`);
       setRooms(response.data || []);
     } catch (error) {
       console.error('Error fetching rooms:', error);
@@ -140,10 +142,17 @@ const Devices = () => {
     }
   };
 
-  const openAssignModal = (device: Device) => {
+  const openAssignModal = async (device: Device) => {
     setSelectedPendingDevice(device);
     setNewDevice({ name: device.name || 'New Device', room_id: 0 });
-    setAssignHotelId(selectedHotel?.ID || null);
+    const hotelIdToUse = selectedHotel?.ID || null;
+    setAssignHotelId(hotelIdToUse);
+    
+    // Fetch available rooms for device assignment
+    if (hotelIdToUse) {
+      await fetchRooms(hotelIdToUse, true); // Only show rooms available for device assignment
+    }
+    
     setShowAssignModal(true);
   };
 
@@ -171,7 +180,12 @@ const Devices = () => {
             <p className="text-gray-500 text-sm mt-1">Register tablets for room access</p>
           </div>
           <button 
-            onClick={() => setShowModal(true)}
+            onClick={async () => {
+              if (selectedHotel) {
+                await fetchRooms(selectedHotel.ID, true); // Only show rooms available for device assignment
+              }
+              setShowModal(true);
+            }}
             disabled={!selectedHotel}
             className="bg-[#008491] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#006a76] shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -201,6 +215,16 @@ const Devices = () => {
                   <div>
                     <div className="font-mono text-xs text-gray-500 mb-1">UUID: {device.uuid?.substring(0, 8)}...</div>
                     <h3 className="font-bold text-gray-800">{device.name || 'Unknown Device'}</h3>
+                    {device.manufacturer || device.model ? (
+                      <p className="text-xs text-gray-600 mt-1">
+                        {device.manufacturer && device.model 
+                          ? `${device.manufacturer} ${device.model}`
+                          : device.manufacturer || device.model}
+                        {device.device_type && (
+                          <span className="ml-2 text-gray-400">({device.device_type})</span>
+                        )}
+                      </p>
+                    ) : null}
                     <span className="inline-block px-2 py-0.5 mt-2 rounded text-xs font-medium bg-orange-100 text-orange-700">
                       Needs Setup
                     </span>
@@ -245,7 +269,18 @@ const Devices = () => {
                 </div>
                 
                 <h3 className="font-bold text-gray-900 text-lg">{device.name}</h3>
-                <p className="text-gray-500 text-sm mb-4">Room {device.room?.number || 'N/A'}</p>
+                <p className="text-gray-500 text-sm mb-2">Room {device.room?.number || 'N/A'}</p>
+                
+                {device.manufacturer || device.model ? (
+                  <p className="text-xs text-gray-600 mb-3">
+                    {device.manufacturer && device.model 
+                      ? `${device.manufacturer} ${device.model}`
+                      : device.manufacturer || device.model}
+                    {device.device_type && (
+                      <span className="ml-2 text-gray-400">({device.device_type})</span>
+                    )}
+                  </p>
+                ) : null}
                 
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-xs text-gray-400">UUID:</span>
@@ -268,7 +303,10 @@ const Devices = () => {
       </div>
 
       {/* Manual Create Modal */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Register New Device">
+      <Modal isOpen={showModal} onClose={() => {
+        setShowModal(false);
+        setNewDevice({ name: '', room_id: 0 });
+      }} title="Register New Device">
         <form onSubmit={handleCreate} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Device Name</label>
@@ -297,7 +335,9 @@ const Devices = () => {
               ))}
             </select>
             {rooms.length === 0 && (
-              <p className="text-xs text-gray-500 mt-1">No rooms available. Create rooms first.</p>
+              <p className="text-xs text-gray-500 mt-1">
+                No rooms available for device assignment. All rooms may already have devices assigned, or you need to create rooms first.
+              </p>
             )}
           </div>
           
@@ -336,10 +376,16 @@ const Devices = () => {
               <select
                 required
                 value={assignHotelId || ''}
-                onChange={(e) => {
+                onChange={async (e) => {
                   const hotelId = Number(e.target.value);
                   setAssignHotelId(hotelId);
                   setNewDevice({...newDevice, room_id: 0}); // Reset room selection
+                  // Fetch available rooms for the selected hotel
+                  if (hotelId) {
+                    await fetchRooms(hotelId, true); // Only show rooms available for device assignment
+                  } else {
+                    setRooms([]);
+                  }
                 }}
                 className="w-full border p-2 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
               >
@@ -380,7 +426,9 @@ const Devices = () => {
               ))}
             </select>
             {(selectedHotel || assignHotelId) && rooms.length === 0 && (
-              <p className="text-xs text-gray-500 mt-1">No rooms available. Create rooms first.</p>
+              <p className="text-xs text-gray-500 mt-1">
+                No rooms available for device assignment. All rooms may already have devices assigned, or you need to create rooms first.
+              </p>
             )}
           </div>
           

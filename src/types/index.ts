@@ -45,6 +45,10 @@ export interface Device {
   status: string;
   fcm_token?: string;
   uuid?: string;
+  device_type?: string; // "android", "ios", etc.
+  manufacturer?: string; // e.g. "Samsung", "Apple"
+  model?: string; // e.g. "SM-T510", "iPad Pro"
+  brand?: string; // Android brand (e.g. "Samsung")
 }
 
 export interface Facility {
