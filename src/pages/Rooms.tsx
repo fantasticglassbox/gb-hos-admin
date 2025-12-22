@@ -169,7 +169,7 @@ const Rooms = () => {
       const formData = new FormData();
       formData.append('file', uploadFile);
 
-      const response = await api.post(`/rooms/bulk?hotel_id=${selectedHotel.ID}`, formData, {
+      const response = await api.post(`/rooms/bulk-upload?hotel_id=${selectedHotel.ID}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
