@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Save, Image as ImageIcon, AlertCircle, Globe, Layout, Type } from 'lucide-react';
+import { Save, Image as ImageIcon, AlertCircle, Globe, Layout, Type, Phone, Plus, Trash2 } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { useHotel } from '../context/HotelContext';
 
@@ -18,7 +18,16 @@ const HotelSettings = () => {
     default_layout: 'list',
     no_item_section: 2,
     display_size: 'normal',
+    call_extensions: '[]',
   });
+
+  interface CallExtension {
+    title: string;
+    subtitle: string;
+    extension: string;
+  }
+
+  const [callExtensions, setCallExtensions] = useState<CallExtension[]>([]);
 
   useEffect(() => {
     if (selectedHotel) {
@@ -32,7 +41,9 @@ const HotelSettings = () => {
         default_layout: 'list',
         no_item_section: 2,
         display_size: 'normal',
+        call_extensions: '[]',
       });
+      setCallExtensions([]);
     }
   }, [selectedHotel]);
 
@@ -42,6 +53,14 @@ const HotelSettings = () => {
     setLoading(true);
     try {
       const response = await api.get(`/hotel-settings/by-hotel/${selectedHotel.ID}`);
+      const callExtensionsData = response.data.call_extensions || '[]';
+      let parsedExtensions: CallExtension[] = [];
+      try {
+        parsedExtensions = JSON.parse(callExtensionsData);
+      } catch (e) {
+        parsedExtensions = [];
+      }
+      
       setFormData({
         app_background_image: response.data.app_background_image || '',
         localization: response.data.localization || '',
@@ -49,7 +68,9 @@ const HotelSettings = () => {
         default_layout: response.data.default_layout || 'list',
         no_item_section: response.data.no_item_section || 2,
         display_size: response.data.display_size || 'normal',
+        call_extensions: callExtensionsData,
       });
+      setCallExtensions(parsedExtensions);
     } catch (error: any) {
       if (error.response?.status === 404) {
         // No settings yet for this hotel - that's fine
@@ -60,7 +81,9 @@ const HotelSettings = () => {
           default_layout: 'list',
           no_item_section: 2,
           display_size: 'normal',
+          call_extensions: '[]',
         });
+        setCallExtensions([]);
       } else {
         console.error('Error fetching hotel setting:', error);
       }
@@ -88,6 +111,7 @@ const HotelSettings = () => {
         default_layout: formData.default_layout,
         no_item_section: formData.no_item_section,
         display_size: formData.display_size,
+        call_extensions: JSON.stringify(callExtensions),
       });
       
       setMessage({ type: 'success', text: 'Settings saved successfully!' });
@@ -325,6 +349,107 @@ const HotelSettings = () => {
                   Recommended for guests who need larger text and easier-to-tap elements.
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Call Extensions Section */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <Phone size={20} className="text-[#008491]" />
+              Call Extensions
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Configure call extension options that will appear in the customer app's call dialog. Each extension requires a title, subtitle, and extension number.
+            </p>
+            
+            <div className="space-y-4">
+              {callExtensions.map((ext, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-start justify-between mb-4">
+                    <h3 className="font-medium text-gray-700">Extension {index + 1}</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = callExtensions.filter((_, i) => i !== index);
+                        setCallExtensions(updated);
+                      }}
+                      className="text-red-500 hover:text-red-700 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        value={ext.title}
+                        onChange={(e) => {
+                          const updated = [...callExtensions];
+                          updated[index].title = e.target.value;
+                          setCallExtensions(updated);
+                        }}
+                        placeholder="e.g., Room Call"
+                        className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#008491] focus:border-[#008491]"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Subtitle
+                      </label>
+                      <input
+                        type="text"
+                        value={ext.subtitle}
+                        onChange={(e) => {
+                          const updated = [...callExtensions];
+                          updated[index].subtitle = e.target.value;
+                          setCallExtensions(updated);
+                        }}
+                        placeholder="e.g., Call from room"
+                        className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#008491] focus:border-[#008491]"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Extension
+                      </label>
+                      <input
+                        type="text"
+                        value={ext.extension}
+                        onChange={(e) => {
+                          const updated = [...callExtensions];
+                          updated[index].extension = e.target.value;
+                          setCallExtensions(updated);
+                        }}
+                        placeholder="e.g., 000 or leave empty"
+                        className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#008491] focus:border-[#008491]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setCallExtensions([...callExtensions, { title: '', subtitle: '', extension: '' }]);
+                }}
+                className="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-gray-600 hover:border-[#008491] hover:text-[#008491] transition-colors flex items-center justify-center gap-2"
+              >
+                <Plus size={20} />
+                Add Call Extension
+              </button>
+              
+              {callExtensions.length === 0 && (
+                <p className="text-xs text-gray-500 text-center py-2">
+                  No call extensions configured. Click "Add Call Extension" to add one.
+                </p>
+              )}
             </div>
           </div>
 
