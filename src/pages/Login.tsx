@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { Lock, Mail } from 'lucide-react';
+import logo from '../assets/logo.svg';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -41,7 +42,10 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md border border-gray-100">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Glassbox Hos</h1>
+          <div className="flex justify-center mb-4">
+            <img src={logo} alt="Glassbox Concierge" className="h-16 w-auto" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900">Glassbox Concierge Admin</h1>
           <p className="text-gray-500 mt-2">Admin Portal Login</p>
         </div>
 
