@@ -20,7 +20,11 @@ interface OrderItem {
 interface Order {
   ID: number;
   CreatedAt: string;
-  room_id: number; // In real app, would fetch room number
+  room_id: number;
+  room?: {
+    ID: number;
+    number: string;
+  };
   total_amount: number;
   status: string;
   items: OrderItem[];
@@ -177,7 +181,7 @@ const Orders = () => {
                     </span>
                   </div>
                   <div className="text-gray-500 text-sm mt-1">
-                    Room {order.room_id} • {format(new Date(order.CreatedAt), 'PP p')}
+                    Room {order.room?.number || order.room_id} • {format(new Date(order.CreatedAt), 'PP p')}
                   </div>
                 </div>
                 <div className="text-right">

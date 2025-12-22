@@ -11,7 +11,6 @@ import {
   TrendingUp,
   TrendingDown,
   Clock,
-  CheckCircle,
   AlertCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -26,9 +25,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer,
-  LineChart,
-  Line
+  ResponsiveContainer
 } from 'recharts';
 
 interface DashboardStats {
@@ -53,6 +50,10 @@ interface Order {
   ID: number;
   CreatedAt: string;
   room_id: number;
+  room?: {
+    ID: number;
+    number: string;
+  };
   total_amount: number;
   status: string;
 }
@@ -75,11 +76,10 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [recentCheckIns, setRecentCheckIns] = useState<CheckIn[]>([]);
-  const [timePeriod, setTimePeriod] = useState<'today' | 'week' | 'month'>('today');
 
   useEffect(() => {
     fetchDashboardData();
-  }, [selectedHotel, timePeriod]);
+  }, [selectedHotel]);
 
   const fetchDashboardData = async () => {
     try {
@@ -322,12 +322,12 @@ const Dashboard = () => {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name}: ${percent ? (percent * 100).toFixed(0) : 0}%`}
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {orderStatusData.map((entry, index) => (
+                  {orderStatusData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -392,7 +392,7 @@ const Dashboard = () => {
                       </span>
                     </div>
                     <p className="text-sm text-gray-600 mt-1">
-                      Room {order.room_id} • {formatCurrency(order.total_amount)}
+                      Room {order.room?.number || order.room_id} • {formatCurrency(order.total_amount)}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
                       {format(new Date(order.CreatedAt), 'MMM d, yyyy HH:mm')}
