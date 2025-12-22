@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
-import { Plus, Edit2, Trash2, ArrowLeft, DoorOpen } from 'lucide-react';
+import { Plus, Edit2, Trash2, ArrowLeft, DoorOpen, Upload, Download, X, AlertCircle, CheckCircle } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
 import Modal from '../components/Modal';
 import type { Room } from '../types';
@@ -21,6 +21,12 @@ const Rooms = () => {
   const [submitting, setSubmitting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingRoom, setDeletingRoom] = useState<Room | null>(null);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (selectedHotel) {
@@ -108,6 +114,98 @@ const Rooms = () => {
       case 'occupied': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'maintenance': return 'bg-red-100 text-red-700 border-red-200';
       default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const csvContent = `number,type,price,floor_no,status
+101,standard,500000,1,available
+102,standard,500000,1,available
+201,deluxe,750000,2,available
+202,deluxe,750000,2,available
+301,suite,1200000,3,available
+302,suite,1200000,3,available`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'rooms_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+        setUploadError('Please select a CSV file');
+        return;
+      }
+      setUploadFile(file);
+      setUploadError(null);
+      setUploadSuccess(null);
+    }
+  };
+
+  const handleBulkUpload = async () => {
+    if (!selectedHotel) {
+      setUploadError('Please select a hotel first');
+      return;
+    }
+
+    if (!uploadFile) {
+      setUploadError('Please select a CSV file');
+      return;
+    }
+
+    setUploading(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+
+      const response = await api.post(`/rooms/bulk?hotel_id=${selectedHotel.ID}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      setUploadSuccess(`Successfully created ${response.data.count} rooms`);
+      setUploadFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      fetchRooms();
+      
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        setShowBulkUploadModal(false);
+        setUploadSuccess(null);
+      }, 2000);
+    } catch (error: any) {
+      console.error('Error uploading rooms:', error);
+      if (error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        setUploadError(`Upload failed:\n${errors.join('\n')}`);
+      } else {
+        setUploadError(error.response?.data?.error || 'Failed to upload rooms. Please check your CSV file format.');
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const resetBulkUpload = () => {
+    setUploadFile(null);
+    setUploadError(null);
+    setUploadSuccess(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -344,14 +442,27 @@ const Rooms = () => {
           <h1 className="text-3xl font-bold text-gray-800">Room Management</h1>
           <p className="text-gray-500 text-sm mt-1">Manage hotel rooms and availability</p>
         </div>
-        <button 
-          onClick={() => setView('create')}
-          disabled={!selectedHotel}
-          className="bg-[#008491] text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-[#006a76] shadow-md shadow-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Plus size={20} />
-          Add Room
-        </button>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => {
+              resetBulkUpload();
+              setShowBulkUploadModal(true);
+            }}
+            disabled={!selectedHotel}
+            className="bg-gray-100 text-gray-700 px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-gray-200 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Upload size={20} />
+            Bulk Upload
+          </button>
+          <button 
+            onClick={() => setView('create')}
+            disabled={!selectedHotel}
+            className="bg-[#008491] text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-[#006a76] shadow-md shadow-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus size={20} />
+            Add Room
+          </button>
+        </div>
       </div>
 
       {!selectedHotel && (
@@ -473,6 +584,117 @@ const Rooms = () => {
               className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium transition-colors"
             >
               Delete
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showBulkUploadModal}
+        onClose={() => {
+          setShowBulkUploadModal(false);
+          resetBulkUpload();
+        }}
+        title="Bulk Upload Rooms"
+      >
+        <div className="p-6">
+          <div className="mb-6">
+            <p className="text-gray-700 mb-4">
+              Upload a CSV file to create multiple rooms at once. The CSV file should include the following columns:
+            </p>
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                <li><strong>number</strong> - Room number (required)</li>
+                <li><strong>type</strong> - Room type: standard, deluxe, suite, or presidential (required)</li>
+                <li><strong>price</strong> - Price per night in IDR (required)</li>
+                <li><strong>floor_no</strong> - Floor number (required)</li>
+                <li><strong>status</strong> - Status: available, occupied, or maintenance (required)</li>
+              </ul>
+            </div>
+            <button
+              onClick={handleDownloadTemplate}
+              className="text-[#008491] hover:text-[#006a76] flex items-center gap-2 text-sm font-medium"
+            >
+              <Download size={16} />
+              Download CSV Template
+            </button>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select CSV File
+            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              onChange={handleFileSelect}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#008491] file:text-white hover:file:bg-[#006a76] file:cursor-pointer"
+            />
+            {uploadFile && (
+              <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+                <span>Selected: {uploadFile.name}</span>
+                <button
+                  onClick={() => {
+                    setUploadFile(null);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {uploadError && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+              <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+              <div className="flex-1">
+                <p className="text-sm text-red-800 font-medium">Upload Error</p>
+                <pre className="text-xs text-red-700 mt-1 whitespace-pre-wrap">{uploadError}</pre>
+              </div>
+            </div>
+          )}
+
+          {uploadSuccess && (
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
+              <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
+              <div className="flex-1">
+                <p className="text-sm text-green-800 font-medium">Success!</p>
+                <p className="text-xs text-green-700 mt-1">{uploadSuccess}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <button
+              onClick={() => {
+                setShowBulkUploadModal(false);
+                resetBulkUpload();
+              }}
+              className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleBulkUpload}
+              disabled={!uploadFile || uploading}
+              className="px-4 py-2 bg-[#008491] text-white hover:bg-[#006a76] rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {uploading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload size={16} />
+                  Upload Rooms
+                </>
+              )}
             </button>
           </div>
         </div>

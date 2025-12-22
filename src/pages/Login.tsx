@@ -45,8 +45,6 @@ const Login = () => {
           <div className="flex justify-center mb-4">
             <img src={logo} alt="Glassbox Concierge" className="h-16 w-auto" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Glassbox Concierge Admin</h1>
-          <p className="text-gray-500 mt-2">Admin Portal Login</p>
         </div>
 
         {error && (
