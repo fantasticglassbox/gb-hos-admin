@@ -234,54 +234,6 @@ const HotelSettings = () => {
               POI Menu Image
             </h2>
             <p className="text-sm text-gray-600 mb-4">
-              Set the background image for the customer app home screen. This image will be displayed 
-              behind the hero section of the app.
-            </p>
-            
-            <div className="space-y-4">
-              {formData.app_background_image && (
-                <div className="relative">
-                  <div className="w-full h-48 rounded-lg overflow-hidden border border-gray-200">
-                    <img
-                      src={formData.app_background_image}
-                      alt="App Background Preview"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, app_background_image: '' })}
-                    className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-600 transition-colors"
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
-              
-              <div className="border-2 border-dashed border-gray-200 rounded-lg p-4">
-                <ImageUpload
-                  value={formData.app_background_image}
-                  onChange={(url) => setFormData({ ...formData, app_background_image: url })}
-                  label={formData.app_background_image ? "Change Image" : "Upload Background Image"}
-                />
-              </div>
-              
-              <p className="text-xs text-gray-500">
-                Recommended: High-resolution image (1920x1080 or larger). Supports JPG, PNG, WebP formats.
-              </p>
-            </div>
-          </div>
-
-          {/* POI Image Section */}
-          <div>
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <ImageIcon size={20} className="text-[#008491]" />
-              POI Menu Image
-            </h2>
-            <p className="text-sm text-gray-600 mb-4">
               Set the image for the Points of Interest (POI) menu entry on the customer app home screen. 
               This image will be displayed as a menu card that users can tap to view all POIs.
             </p>
