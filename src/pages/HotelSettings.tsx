@@ -79,6 +79,7 @@ const HotelSettings = () => {
         // No settings yet for this hotel - that's fine
         setFormData({ 
           app_background_image: '',
+          poi_image: '',
           localization: '',
           default_lang: 'EN',
           default_layout: 'list',
