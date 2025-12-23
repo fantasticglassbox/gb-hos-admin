@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Plus, Trash2, ArrowLeft, Edit, Globe, FileText } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Edit, Globe, FileText, X } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
 import ImageUpload from '../components/ImageUpload';
 
@@ -9,7 +9,8 @@ interface POI {
   title: string;
   type: 'normal' | 'webview';
   description: string;
-  image_url?: string;
+  image_url?: string; // Deprecated, kept for backward compatibility
+  image_urls?: string[]; // Array of image URLs
   url: string;
 }
 
@@ -26,7 +27,8 @@ const POIs = () => {
     title: '', 
     type: 'normal' as 'normal' | 'webview',
     description: '',
-    image_url: '',
+    image_url: '', // Deprecated, kept for backward compatibility
+    image_urls: [] as string[], // Array of image URLs
     url: '',
   });
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -40,7 +42,29 @@ const POIs = () => {
     setLoading(true);
     try {
       const response = await api.get('/pois');
-      setPois(response.data);
+      // Parse image_urls from JSON string if present
+      const poisWithParsedUrls = response.data.map((poi: any) => {
+        let imageUrls: string[] = [];
+        if (poi.image_urls) {
+          try {
+            imageUrls = typeof poi.image_urls === 'string' 
+              ? JSON.parse(poi.image_urls) 
+              : poi.image_urls;
+          } catch (e) {
+            // If parsing fails, use empty array
+            imageUrls = [];
+          }
+        }
+        // Backward compatibility: if no image_urls but has image_url, add it
+        if (imageUrls.length === 0 && poi.image_url) {
+          imageUrls = [poi.image_url];
+        }
+        return {
+          ...poi,
+          image_urls: imageUrls,
+        };
+      });
+      setPois(poisWithParsedUrls);
     } catch (error) {
       console.error('Error fetching POIs:', error);
     } finally {
@@ -74,8 +98,8 @@ const POIs = () => {
 
       if (formData.type === 'normal') {
         payload.description = formData.description;
-        // Always include image_url for normal type (even if empty, to allow clearing)
-        payload.image_url = formData.image_url || '';
+        // Send image_urls array (even if empty, to allow clearing)
+        payload.image_urls = formData.image_urls.length > 0 ? formData.image_urls : [];
       } else {
         payload.url = formData.url;
       }
@@ -85,7 +109,7 @@ const POIs = () => {
       } else {
         await api.post('/pois', payload);
       }
-      setFormData({ title: '', type: 'normal', description: '', image_url: '', url: '' });
+      setFormData({ title: '', type: 'normal', description: '', image_url: '', image_urls: [], url: '' });
       setEditingId(null);
       setView('list');
       fetchPOIs();
@@ -98,15 +122,63 @@ const POIs = () => {
   };
 
   const handleEdit = (poi: POI) => {
+    // Parse image_urls from JSON string if present, or use array directly
+    let imageUrls: string[] = [];
+    if (poi.image_urls && Array.isArray(poi.image_urls)) {
+      imageUrls = poi.image_urls;
+    } else if (poi.image_urls && typeof poi.image_urls === 'string') {
+      try {
+        imageUrls = JSON.parse(poi.image_urls);
+      } catch (e) {
+        console.error('Error parsing image_urls:', e);
+      }
+    }
+    // Backward compatibility: if no image_urls but has image_url, add it
+    if (imageUrls.length === 0 && poi.image_url) {
+      imageUrls = [poi.image_url];
+    }
+    
     setFormData({ 
       title: poi.title, 
       type: poi.type,
       description: poi.description || '',
       image_url: poi.image_url || '',
+      image_urls: imageUrls,
       url: poi.url || '',
     });
     setEditingId(poi.ID);
     setView('edit');
+  };
+
+  const handleAddImage = (url: string) => {
+    setFormData({ ...formData, image_urls: [...formData.image_urls, url] });
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setFormData({ 
+      ...formData, 
+      image_urls: formData.image_urls.filter((_, i) => i !== index) 
+    });
+  };
+
+  const getImagesForPOI = (poi: POI): string[] => {
+    if (poi.image_urls && Array.isArray(poi.image_urls) && poi.image_urls.length > 0) {
+      return poi.image_urls;
+    }
+    if (poi.image_urls && typeof poi.image_urls === 'string') {
+      try {
+        const parsed = JSON.parse(poi.image_urls);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+    if (poi.image_url) {
+      return [poi.image_url];
+    }
+    return [];
   };
 
   const handleDelete = async (id: number) => {
@@ -128,7 +200,7 @@ const POIs = () => {
           <button
             onClick={() => {
               setView('list');
-              setFormData({ title: '', type: 'normal', description: '', image_url: '', url: '' });
+              setFormData({ title: '', type: 'normal', description: '', image_url: '', image_urls: [], url: '' });
               setEditingId(null);
             }}
             className="text-gray-500 hover:text-gray-700"
@@ -197,39 +269,47 @@ const POIs = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Image (Optional)
+                    Images (Multiple, Optional)
                   </label>
-                  {formData.image_url && (
-                    <div className="mb-3 relative">
-                      <div className="w-full h-48 rounded-lg overflow-hidden border border-gray-200">
-                        <img
-                          src={formData.image_url}
-                          alt="POI Preview"
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
+                  <div className="space-y-3">
+                    {formData.image_urls.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {formData.image_urls.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <div className="relative w-full h-32 rounded-lg overflow-hidden border border-gray-200">
+                              <img
+                                src={url}
+                                alt={`POI Image ${index + 1}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImage(index)}
+                              className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        ))}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, image_url: '' })}
-                        className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-600 transition-colors"
-                      >
-                        Remove
-                      </button>
+                    )}
+                    <div className="border-2 border-dashed border-gray-200 rounded-lg p-4">
+                      <ImageUpload
+                        value=""
+                        onChange={handleAddImage}
+                        label="Add Image"
+                      />
                     </div>
-                  )}
-                  <div className="border-2 border-dashed border-gray-200 rounded-lg p-4">
-                    <ImageUpload
-                      value={formData.image_url}
-                      onChange={(url) => setFormData({ ...formData, image_url: url })}
-                      label={formData.image_url ? "Change Image" : "Upload Image"}
-                    />
+                    {formData.image_urls.length === 0 && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        Optional: You can add multiple images. Upload or paste image URLs.
+                      </p>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Optional: Add an image to display with this POI
-                  </p>
                 </div>
               </>
             ) : (
@@ -263,7 +343,7 @@ const POIs = () => {
                 type="button"
                 onClick={() => {
                   setView('list');
-                  setFormData({ title: '', type: 'normal', description: '', image_url: '', url: '' });
+                  setFormData({ title: '', type: 'normal', description: '', image_url: '', image_urls: [], url: '' });
                   setEditingId(null);
                 }}
                 className="px-6 py-3 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-all"
@@ -321,18 +401,29 @@ const POIs = () => {
               key={poi.ID}
               className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all"
             >
-              {poi.type === 'normal' && poi.image_url && (
-                <div className="w-full h-48 bg-gray-100 overflow-hidden">
-                  <img
-                    src={poi.image_url}
-                    alt={poi.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                </div>
-              )}
+              {poi.type === 'normal' && (() => {
+                const images = getImagesForPOI(poi);
+                if (images.length > 0) {
+                  return (
+                    <div className="relative w-full h-48 bg-gray-100 overflow-hidden">
+                      <img
+                        src={images[0]}
+                        alt={poi.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      {images.length > 1 && (
+                        <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
+                          +{images.length - 1} more
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               <div className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <h3 className="text-lg font-semibold text-gray-800 flex-1">{poi.title}</h3>
