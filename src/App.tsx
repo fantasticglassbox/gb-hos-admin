@@ -10,6 +10,7 @@ import Hotels from './pages/Hotels';
 import Devices from './pages/Devices';
 import Users from './pages/Users';
 import Facilities from './pages/Facilities';
+import POIs from './pages/POIs';
 import Rooms from './pages/Rooms';
 import HotelSettings from './pages/HotelSettings';
 import Login from './pages/Login';
@@ -59,6 +60,7 @@ function App() {
             <Route path="orders" element={<Orders />} />
             <Route path="ads" element={<Ads />} />
             <Route path="facilities" element={<Facilities />} />
+            <Route path="pois" element={<POIs />} />
             <Route path="rooms" element={<Rooms />} />
             <Route path="hotel-settings" element={<HotelSettings />} />
           </Route>
