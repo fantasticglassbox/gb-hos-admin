@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Plus, Trash2, ArrowLeft, Edit, Globe, FileText } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Edit, Globe, FileText, Image as ImageIcon } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
+import ImageUpload from '../components/ImageUpload';
 
 interface POI {
   ID: number;
   title: string;
   type: 'normal' | 'webview';
   description: string;
+  image_url?: string;
   url: string;
 }
 
@@ -24,6 +26,7 @@ const POIs = () => {
     title: '', 
     type: 'normal' as 'normal' | 'webview',
     description: '',
+    image_url: '',
     url: '',
   });
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -71,6 +74,8 @@ const POIs = () => {
 
       if (formData.type === 'normal') {
         payload.description = formData.description;
+        // Always include image_url for normal type (even if empty, to allow clearing)
+        payload.image_url = formData.image_url || '';
       } else {
         payload.url = formData.url;
       }
@@ -80,7 +85,7 @@ const POIs = () => {
       } else {
         await api.post('/pois', payload);
       }
-      setFormData({ title: '', type: 'normal', description: '', url: '' });
+      setFormData({ title: '', type: 'normal', description: '', image_url: '', url: '' });
       setEditingId(null);
       setView('list');
       fetchPOIs();
@@ -97,6 +102,7 @@ const POIs = () => {
       title: poi.title, 
       type: poi.type,
       description: poi.description || '',
+      image_url: poi.image_url || '',
       url: poi.url || '',
     });
     setEditingId(poi.ID);
@@ -122,7 +128,7 @@ const POIs = () => {
           <button
             onClick={() => {
               setView('list');
-              setFormData({ title: '', type: 'normal', description: '', url: '' });
+              setFormData({ title: '', type: 'normal', description: '', image_url: '', url: '' });
               setEditingId(null);
             }}
             className="text-gray-500 hover:text-gray-700"
@@ -175,19 +181,57 @@ const POIs = () => {
             </div>
 
             {formData.type === 'normal' ? (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description *
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Enter description for this POI..."
-                  rows={6}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#008491] focus:border-transparent outline-none resize-none"
-                  required
-                />
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description *
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Enter description for this POI..."
+                    rows={6}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#008491] focus:border-transparent outline-none resize-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Image (Optional)
+                  </label>
+                  {formData.image_url && (
+                    <div className="mb-3 relative">
+                      <div className="w-full h-48 rounded-lg overflow-hidden border border-gray-200">
+                        <img
+                          src={formData.image_url}
+                          alt="POI Preview"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, image_url: '' })}
+                        className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-lg text-sm hover:bg-red-600 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  <div className="border-2 border-dashed border-gray-200 rounded-lg p-4">
+                    <ImageUpload
+                      value={formData.image_url}
+                      onChange={(url) => setFormData({ ...formData, image_url: url })}
+                      label={formData.image_url ? "Change Image" : "Upload Image"}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Optional: Add an image to display with this POI
+                  </p>
+                </div>
+              </>
             ) : (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -219,7 +263,7 @@ const POIs = () => {
                 type="button"
                 onClick={() => {
                   setView('list');
-                  setFormData({ title: '', type: 'normal', description: '', url: '' });
+                  setFormData({ title: '', type: 'normal', description: '', image_url: '', url: '' });
                   setEditingId(null);
                 }}
                 className="px-6 py-3 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-all"
@@ -277,6 +321,18 @@ const POIs = () => {
               key={poi.ID}
               className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all"
             >
+              {poi.type === 'normal' && poi.image_url && (
+                <div className="w-full h-48 bg-gray-100 overflow-hidden">
+                  <img
+                    src={poi.image_url}
+                    alt={poi.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
               <div className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <h3 className="text-lg font-semibold text-gray-800 flex-1">{poi.title}</h3>
