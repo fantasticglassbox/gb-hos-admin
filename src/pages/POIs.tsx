@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Plus, Trash2, ArrowLeft, Edit, Globe, FileText, Image as ImageIcon } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Edit, Globe, FileText } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
 import ImageUpload from '../components/ImageUpload';
 
