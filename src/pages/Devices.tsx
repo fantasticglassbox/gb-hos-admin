@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Monitor, Plus, Trash2, Smartphone, CheckCircle, AlertCircle } from 'lucide-react';
+import { Monitor, Trash2, Smartphone, CheckCircle, AlertCircle } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
 import Modal from '../components/Modal';
 import type { Device, Room } from '../types';
