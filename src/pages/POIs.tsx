@@ -6,6 +6,7 @@ import ImageUpload from '../components/ImageUpload';
 
 interface POI {
   ID: number;
+  hotel_id: number;
   title: string;
   type: 'normal' | 'webview';
   description: string;
@@ -41,7 +42,10 @@ const POIs = () => {
   const fetchPOIs = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/pois');
+      const url = selectedHotel 
+        ? `/pois?hotel_id=${selectedHotel.ID}` 
+        : '/pois';
+      const response = await api.get(url);
       // Parse image_urls from JSON string if present
       const poisWithParsedUrls = response.data.map((poi: any) => {
         let imageUrls: string[] = [];
@@ -89,9 +93,15 @@ const POIs = () => {
       return;
     }
 
+    if (!selectedHotel) {
+      alert('Please select a hotel first');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const payload: any = {
+        hotel_id: selectedHotel.ID,
         title: formData.title,
         type: formData.type,
       };
@@ -366,12 +376,20 @@ const POIs = () => {
     );
   }
 
+  if (!selectedHotel) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-gray-500">Please select a hotel to manage POIs</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Points of Interest</h1>
-          <p className="text-gray-500 text-sm mt-1">Manage points of interest for guests</p>
+          <p className="text-gray-500 text-sm mt-1">Manage points of interest for {selectedHotel.name}</p>
         </div>
         <button 
           onClick={() => setView('create')}

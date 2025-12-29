@@ -6,6 +6,7 @@ import { useHotel } from '../context/HotelContext';
 
 interface Ad {
   ID: number;
+  hotel_id: number;
   title: string;
   description: string;
   image_url: string;
@@ -56,9 +57,16 @@ const Ads = () => {
 
   const handleAddAd = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!selectedHotel) {
+      alert('Please select a hotel first');
+      return;
+    }
+    
     setSubmitting(true);
     try {
       const adData: any = {
+        hotel_id: selectedHotel.ID,
         title: newAd.title,
         description: newAd.description,
         image_url: newAd.image_url,
@@ -210,12 +218,20 @@ const Ads = () => {
   }
 
   // --- LIST VIEW ---
+  if (!selectedHotel) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-gray-500">Please select a hotel to manage ads</p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Ads & Promos</h1>
-          <p className="text-gray-500 text-sm mt-1">Manage digital signage and promotional content</p>
+          <p className="text-gray-500 text-sm mt-1">Manage digital signage and promotional content for {selectedHotel.name}</p>
         </div>
         <button 
           onClick={() => setView('create')}
