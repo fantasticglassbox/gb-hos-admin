@@ -8,15 +8,26 @@ interface ImageUploadProps {
   label?: string;
   accept?: string;
   allowedTypes?: string[];
+  maxSizeMB?: number;
 }
 
-const ImageUpload = ({ value, onChange, label = "Media", accept = "image/*,video/*", allowedTypes }: ImageUploadProps) => {
+const ImageUpload = ({ value, onChange, label = "Media", accept = "image/*,video/*", allowedTypes, maxSizeMB = 10 }: ImageUploadProps) => {
   const [uploading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Validate file size
+    const maxSizeBytes = maxSizeMB * 1024 * 1024; // Convert MB to bytes
+    if (file.size > maxSizeBytes) {
+      alert(`File size exceeds the maximum limit of ${maxSizeMB}MB. Please choose a smaller file.`);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
 
     // Validate file type if allowedTypes is specified
     if (allowedTypes && allowedTypes.length > 0) {
@@ -114,7 +125,7 @@ const ImageUpload = ({ value, onChange, label = "Media", accept = "image/*,video
               <span className="text-sm font-medium">Click to upload media</span>
               <span className="text-xs text-gray-400 mt-1">
                 {allowedTypes && allowedTypes.length > 0 
-                  ? `Images only (${allowedTypes.map(t => t.toUpperCase()).join(', ')})`
+                  ? `Images only (${allowedTypes.map(t => t.toUpperCase()).join(', ')}) - Max ${maxSizeMB}MB`
                   : 'Images or Video (MP4, WebM)'}
               </span>
             </div>

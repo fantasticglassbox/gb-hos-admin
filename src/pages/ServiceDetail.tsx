@@ -400,6 +400,9 @@ const ServiceDetail = () => {
                 value={serviceImageUrl}
                 onChange={(url) => setServiceImageUrl(url)}
                 label={serviceImageUrl ? "Change Image" : "Upload Service Image"}
+                accept="image/png,image/jpeg,image/jpg"
+                allowedTypes={['png', 'jpeg', 'jpg']}
+                maxSizeMB={2}
               />
             </div>
           </div>

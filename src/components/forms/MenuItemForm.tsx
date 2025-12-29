@@ -127,6 +127,7 @@ const MenuItemForm = ({ categories, initialCategoryId, editingItem, onSuccess, o
           label=""
           accept="image/png,image/jpeg,image/jpg"
           allowedTypes={['png', 'jpeg', 'jpg']}
+          maxSizeMB={2}
         />
       </div>
 

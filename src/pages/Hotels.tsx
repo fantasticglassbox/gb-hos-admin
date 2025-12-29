@@ -224,6 +224,9 @@ const Hotels = () => {
                   value={newHotel.image_url}
                   onChange={(url) => setNewHotel({...newHotel, image_url: url})}
                   label="Click to upload cover image"
+                  accept="image/png,image/jpeg,image/jpg"
+                  allowedTypes={['png', 'jpeg', 'jpg']}
+                  maxSizeMB={2}
                 />
               </div>
             </div>

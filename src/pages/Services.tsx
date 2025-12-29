@@ -239,6 +239,9 @@ const Services = () => {
                   value={newService.image_url}
                   onChange={(url) => setNewService({ ...newService, image_url: url })}
                   label={newService.image_url ? "Change Image" : "Upload Service Image"}
+                  accept="image/png,image/jpeg,image/jpg"
+                  allowedTypes={['png', 'jpeg', 'jpg']}
+                  maxSizeMB={2}
                 />
               </div>
             </div>
@@ -468,6 +471,9 @@ const Services = () => {
                 value={editFormData.image_url}
                 onChange={(url) => setEditFormData({ ...editFormData, image_url: url })}
                 label={editFormData.image_url ? "Change Image" : "Upload Service Image"}
+                accept="image/png,image/jpeg,image/jpg"
+                allowedTypes={['png', 'jpeg', 'jpg']}
+                maxSizeMB={2}
               />
             </div>
           </div>

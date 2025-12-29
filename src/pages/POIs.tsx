@@ -333,6 +333,9 @@ const POIs = () => {
                         value=""
                         onChange={handleAddImage}
                         label="Add Image"
+                        accept="image/png,image/jpeg,image/jpg"
+                        allowedTypes={['png', 'jpeg', 'jpg']}
+                        maxSizeMB={2}
                       />
                     </div>
                     {formData.image_urls.length === 0 && (
