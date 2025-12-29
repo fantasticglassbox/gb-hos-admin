@@ -74,6 +74,7 @@ const Dashboard = () => {
   const { selectedHotel } = useHotel();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [recentCheckIns, setRecentCheckIns] = useState<CheckIn[]>([]);
 
@@ -84,6 +85,7 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError(null);
       const hotelIdParam = selectedHotel ? `?hotel_id=${selectedHotel.ID}` : '';
       const [statsResponse, ordersResponse, checkInsResponse] = await Promise.all([
         api.get(`/dashboard/stats${hotelIdParam}`),
@@ -94,7 +96,7 @@ const Dashboard = () => {
       setStats(statsResponse.data);
       
       // Sort orders by newest first and take top 5
-      const sortedOrders = ordersResponse.data
+      const sortedOrders = (ordersResponse.data || [])
         .sort((a: Order, b: Order) => 
           new Date(b.CreatedAt).getTime() - new Date(a.CreatedAt).getTime()
         )
@@ -102,14 +104,15 @@ const Dashboard = () => {
       setRecentOrders(sortedOrders);
 
       // Sort check-ins by newest first and take top 5
-      const sortedCheckIns = checkInsResponse.data
+      const sortedCheckIns = (checkInsResponse.data || [])
         .sort((a: CheckIn, b: CheckIn) => 
           new Date(b.CreatedAt).getTime() - new Date(a.CreatedAt).getTime()
         )
         .slice(0, 5);
       setRecentCheckIns(sortedCheckIns);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching dashboard data:', error);
+      setError(error.response?.data?.error || 'Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -162,13 +165,43 @@ const Dashboard = () => {
     );
   }
 
+  if (error && !stats) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="mx-auto text-red-500 mb-2" size={32} />
+          <p className="text-red-600 font-medium">{error}</p>
+          <button
+            onClick={fetchDashboardData}
+            className="mt-4 px-4 py-2 bg-[#008491] text-white rounded-lg hover:bg-[#006a76] transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-        {selectedHotel && (
-          <div className="text-sm text-gray-600">
-            Hotel: <span className="font-semibold">{selectedHotel.name}</span>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            {selectedHotel 
+              ? `Analytics for ${selectedHotel.name}` 
+              : 'Overview of all hotels'}
+          </p>
+        </div>
+        {selectedHotel ? (
+          <div className="text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-100">
+            <span className="font-medium text-blue-900">Filtered by:</span>{' '}
+            <span className="font-semibold text-blue-700">{selectedHotel.name}</span>
+          </div>
+        ) : (
+          <div className="text-sm text-gray-500 bg-gray-50 px-4 py-2 rounded-lg border border-gray-200">
+            <span className="font-medium">Showing:</span>{' '}
+            <span className="font-semibold">All Hotels</span>
           </div>
         )}
       </div>
