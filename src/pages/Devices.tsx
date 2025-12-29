@@ -168,34 +168,21 @@ const Devices = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
+    <div>
       {/* Device Management Section */}
       <div>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              <Monitor className="text-[#008491]" />
+            <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+              <Monitor className="text-[#008491]" size={32} />
               Device Management
             </h1>
             <p className="text-gray-500 text-sm mt-1">Register tablets for room access</p>
           </div>
-          <button 
-            onClick={async () => {
-              if (selectedHotel) {
-                await fetchRooms(selectedHotel.ID, true); // Only show rooms available for device assignment
-              }
-              setShowModal(true);
-            }}
-            disabled={!selectedHotel}
-            className="bg-[#008491] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-[#006a76] shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Plus size={20} />
-            Manually Add
-          </button>
         </div>
 
         {!selectedHotel && (
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
               <strong>Viewing all hotels:</strong> Showing all assigned devices across all hotels. Unassigned devices are shown below.
             </p>
@@ -241,22 +228,24 @@ const Devices = () => {
           </div>
         )}
         
-        {loading ? (
-          <div className="text-center py-12 text-gray-500">Loading devices...</div>
-        ) : devices.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-200">
-            <Smartphone className="mx-auto text-gray-300 mb-3" size={48} />
-            <h3 className="text-lg font-medium text-gray-900">
-              {selectedHotel ? 'No Active Devices' : 'No Assigned Devices'}
-            </h3>
-            <p className="text-gray-500 mb-4">
-              {selectedHotel 
-                ? 'Connect a tablet to wifi and open the app to see it here.'
-                : 'No devices are currently assigned to any hotel. Unassigned devices will appear above.'}
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          {loading ? (
+            <div className="text-center py-12 text-gray-500">Loading devices...</div>
+          ) : devices.length === 0 ? (
+            <div className="text-center py-16">
+              <Smartphone className="mx-auto text-gray-300 mb-3" size={48} />
+              <h3 className="text-lg font-medium text-gray-900">
+                {selectedHotel ? 'No Active Devices' : 'No Assigned Devices'}
+              </h3>
+              <p className="text-gray-500 mb-4">
+                {selectedHotel 
+                  ? 'Connect a tablet to wifi and open the app to see it here.'
+                  : 'No devices are currently assigned to any hotel. Unassigned devices will appear above.'}
+              </p>
+            </div>
+          ) : (
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {devices.map((device) => (
               <div key={device.ID} className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex justify-between items-start mb-4">
@@ -297,9 +286,11 @@ const Devices = () => {
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+              ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Manual Create Modal */}

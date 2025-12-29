@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Plus, Trash2, ArrowLeft, Image as ImageIcon, Edit, X, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Image as ImageIcon, Edit, X, Clock, ChevronLeft, ChevronRight, Dumbbell } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { useHotel } from '../context/HotelContext';
 import type { Facility } from '../types';
 
 const Facilities = () => {
-  const { selectedHotel } = useHotel();
+  const { selectedHotel, hotels, setSelectedHotel } = useHotel();
+  const [searchParams] = useSearchParams();
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -26,15 +28,32 @@ const Facilities = () => {
   const [submitting, setSubmitting] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState<{ [key: number]: number }>({});
 
+  // Get hotel_id from URL query params as fallback
+  const urlHotelId = searchParams.get('hotel_id');
+
+  // Set hotel from URL if not already selected
   useEffect(() => {
+    if (urlHotelId && hotels.length > 0 && !selectedHotel) {
+      const hotelId = Number(urlHotelId);
+      const hotel = hotels.find(h => h.ID === hotelId);
+      if (hotel) {
+        setSelectedHotel(hotel);
+      }
+    }
+  }, [urlHotelId, hotels, selectedHotel, setSelectedHotel]);
+
+  useEffect(() => {
+    // Re-fetch when hotel changes or URL hotel_id changes
     fetchFacilities();
-  }, [selectedHotel]);
+  }, [selectedHotel, urlHotelId]);
 
   const fetchFacilities = async () => {
     setLoading(true);
     try {
-      const url = selectedHotel 
-        ? `/facilities?hotel_id=${selectedHotel.ID}` 
+      // Use selectedHotel first, then fallback to URL hotel_id
+      const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+      const url = hotelId 
+        ? `/facilities?hotel_id=${hotelId}` 
         : '/facilities';
       const response = await api.get(url);
       // Parse image_urls from JSON string if present
@@ -74,15 +93,28 @@ const Facilities = () => {
       return;
     }
 
+    // Use selectedHotel first, then fallback to URL hotel_id
+    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+    
+    if (!hotelId && !editingId) {
+      alert('Please select a hotel first');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const payload = {
+      const payload: any = {
         name: formData.name,
         image_urls: formData.image_urls.length > 0 ? formData.image_urls : (formData.image_url ? [formData.image_url] : []),
         opening_time: formData.opening_time,
         closing_time: formData.closing_time,
         description: formData.description,
       };
+
+      // Add hotel_id for new facilities
+      if (!editingId && hotelId) {
+        payload.hotel_id = hotelId;
+      }
 
       if (editingId) {
         await api.put(`/facilities/${editingId}`, payload);
@@ -374,19 +406,14 @@ const Facilities = () => {
   }
 
   // --- LIST VIEW ---
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-gray-500">
-        Loading facilities...
-      </div>
-    );
-  }
-
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Facilities</h1>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+            <Dumbbell className="text-[#008491]" size={32} />
+            Facilities
+          </h1>
           <p className="text-gray-500 text-sm mt-1">Manage hotel facilities (Gym, Pool, Spa, etc.)</p>
         </div>
         <button 
@@ -398,27 +425,31 @@ const Facilities = () => {
         </button>
       </div>
 
-      {facilities.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          <ImageIcon size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-700 mb-2">No facilities yet</h3>
-          <p className="text-gray-500 mb-6">Get started by adding your first facility</p>
-          <button
-            onClick={() => setView('create')}
-            className="bg-[#008491] text-white px-6 py-2.5 rounded-lg hover:bg-[#006a76] transition-all"
-          >
-            Add Facility
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {facilities.map((facility) => {
-            const images = getImagesForFacility(facility);
-            return (
-              <div
-                key={facility.ID}
-                className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all"
-              >
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">Loading facilities...</div>
+        ) : facilities.length === 0 ? (
+          <div className="text-center py-16">
+            <Dumbbell className="mx-auto text-gray-300 mb-3" size={48} />
+            <h3 className="text-lg font-medium text-gray-900">No Facilities Found</h3>
+            <p className="text-gray-500 mb-4">Get started by adding your first facility.</p>
+            <button
+              onClick={() => setView('create')}
+              className="bg-[#008491] text-white px-6 py-2.5 rounded-lg hover:bg-[#006a76] transition-all"
+            >
+              Add Facility
+            </button>
+          </div>
+        ) : (
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {facilities.map((facility) => {
+                const images = getImagesForFacility(facility);
+                return (
+                  <div
+                    key={facility.ID}
+                    className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all"
+                  >
                 <ImageSlider images={images} facilityId={facility.ID} />
                 <div className="p-5">
                   <h3 className="text-lg font-semibold text-gray-800 mb-2">{facility.name}</h3>
@@ -449,11 +480,13 @@ const Facilities = () => {
                     </button>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

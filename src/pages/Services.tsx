@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Plus, Edit2, Trash2, ArrowLeft, Settings } from 'lucide-react';
+import { Plus, Edit2, Trash2, ArrowLeft, Settings, Utensils } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
 import ImageUpload from '../components/ImageUpload';
 import Modal from '../components/Modal';
@@ -17,7 +17,8 @@ interface Service {
 
 const Services = () => {
   const navigate = useNavigate();
-  const { selectedHotel } = useHotel();
+  const { selectedHotel, hotels, setSelectedHotel } = useHotel();
+  const [searchParams] = useSearchParams();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'create'>('list');
@@ -27,16 +28,38 @@ const Services = () => {
   const [editFormData, setEditFormData] = useState({ name: '', type: 'food', price: 0, description: '', image_url: '' });
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Get hotel_id from URL query params as fallback
+  const urlHotelId = searchParams.get('hotel_id');
+
+  // Set hotel from URL if not already selected
   useEffect(() => {
-    if (selectedHotel) {
+    if (urlHotelId && hotels.length > 0 && !selectedHotel) {
+      const hotelId = Number(urlHotelId);
+      const hotel = hotels.find(h => h.ID === hotelId);
+      if (hotel) {
+        setSelectedHotel(hotel);
+      }
+    }
+  }, [urlHotelId, hotels, selectedHotel, setSelectedHotel]);
+
+  useEffect(() => {
+    // Re-fetch when hotel changes or URL hotel_id changes
+    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+    if (hotelId) {
       fetchServices();
     }
-  }, [selectedHotel]);
+  }, [selectedHotel, urlHotelId]);
 
   const fetchServices = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/services?hotel_id=${selectedHotel?.ID}`);
+      // Use selectedHotel first, then fallback to URL hotel_id
+      const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+      if (!hotelId) {
+        setLoading(false);
+        return;
+      }
+      const response = await api.get(`/services?hotel_id=${hotelId}`);
       setServices(response.data);
     } catch (error) {
       console.error('Error fetching services:', error);
@@ -47,14 +70,16 @@ const Services = () => {
 
   const handleAddService = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedHotel) return alert('Please select a hotel first');
+    // Use selectedHotel first, then fallback to URL hotel_id
+    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+    if (!hotelId) return alert('Please select a hotel first');
     
     setSubmitting(true);
     try {
       await api.post('/services', {
         ...newService,
         price: Number(newService.price),
-        hotel_id: selectedHotel.ID
+        hotel_id: hotelId
       });
       setNewService({ name: '', type: 'food', price: 0, description: '', image_url: '' });
       setView('list');
@@ -245,7 +270,10 @@ const Services = () => {
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Services</h1>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+            <Utensils className="text-[#008491]" size={32} />
+            Services
+          </h1>
           <p className="text-gray-500 text-sm mt-1">Manage guest services and menus</p>
         </div>
         <button 
@@ -258,33 +286,37 @@ const Services = () => {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
-            <tr>
-              <th className="p-5 w-20">Image</th>
-              <th className="p-5 w-1/4">Name</th>
-              <th className="p-5">Type</th>
-              <th className="p-5">Base Price</th>
-              <th className="p-5 w-1/3">Description</th>
-              <th className="p-5 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="p-12 text-center text-gray-500">Loading services...</td>
-              </tr>
-            ) : services.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="p-12 text-center text-gray-500">
-                  No services found for this hotel. <br/>
-                  <button onClick={() => setView('create')} className="text-[#008491] hover:underline mt-2 font-medium">Create your first service</button>
-                </td>
-              </tr>
-            ) : (
-              services.map((service) => (
-                <tr key={service.ID} className="hover:bg-gray-50 transition-colors group">
-                  <td className="p-5">
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">Loading services...</div>
+        ) : services.length === 0 ? (
+          <div className="text-center py-16">
+            <Utensils className="mx-auto text-gray-300 mb-3" size={48} />
+            <h3 className="text-lg font-medium text-gray-900">No Services Found</h3>
+            <p className="text-gray-500 mb-4">Get started by creating your first service.</p>
+            <button 
+              onClick={() => setView('create')}
+              className="bg-[#008491] text-white px-6 py-2.5 rounded-lg hover:bg-[#006a76] transition-all"
+            >
+              Create First Service
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
+                <tr>
+                  <th className="p-5 w-20">Image</th>
+                  <th className="p-5 w-1/4">Name</th>
+                  <th className="p-5">Type</th>
+                  <th className="p-5">Base Price</th>
+                  <th className="p-5 w-1/3">Description</th>
+                  <th className="p-5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {services.map((service) => (
+                  <tr key={service.ID} className="hover:bg-gray-50 transition-colors group">
+                    <td className="p-5">
                     {service.image_url ? (
                       <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
                         <img
@@ -303,16 +335,16 @@ const Services = () => {
                         </span>
                       </div>
                     )}
-                  </td>
-                  <td className="p-5 font-medium text-gray-900">{service.name}</td>
-                  <td className="p-5">
-                    <span className="px-2.5 py-1 bg-[#e0fbfc] text-[#006a76] rounded-full text-xs font-bold uppercase tracking-wide">
-                      {service.type}
-                    </span>
-                  </td>
-                  <td className="p-5 text-gray-600">Rp {service.price.toLocaleString()}</td>
-                  <td className="p-5 text-gray-500 text-sm max-w-xs truncate">{service.description}</td>
-                  <td className="p-5 text-right">
+                    </td>
+                    <td className="p-5 font-medium text-gray-900">{service.name}</td>
+                    <td className="p-5">
+                      <span className="px-2.5 py-1 bg-[#e0fbfc] text-[#006a76] rounded-full text-xs font-bold uppercase tracking-wide">
+                        {service.type}
+                      </span>
+                    </td>
+                    <td className="p-5 text-gray-600">Rp {service.price.toLocaleString()}</td>
+                    <td className="p-5 text-gray-500 text-sm max-w-xs truncate">{service.description}</td>
+                    <td className="p-5 text-right">
                     <div className="flex gap-2 justify-end opacity-60 group-hover:opacity-100 transition-opacity">
                       <button 
                         onClick={() => handleEditService(service)}
@@ -336,12 +368,13 @@ const Services = () => {
                         <Trash2 size={18} />
                       </button>
                     </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Edit Service Modal */}

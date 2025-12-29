@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Plus, Trash2, ArrowLeft, Edit, Globe, FileText, X } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Edit, Globe, FileText, X, MapPin } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
 import ImageUpload from '../components/ImageUpload';
 
@@ -16,7 +17,8 @@ interface POI {
 }
 
 const POIs = () => {
-  const { selectedHotel } = useHotel();
+  const { selectedHotel, hotels, setSelectedHotel } = useHotel();
+  const [searchParams] = useSearchParams();
   const [pois, setPois] = useState<POI[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -35,15 +37,32 @@ const POIs = () => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Get hotel_id from URL query params as fallback
+  const urlHotelId = searchParams.get('hotel_id');
+
+  // Set hotel from URL if not already selected
   useEffect(() => {
+    if (urlHotelId && hotels.length > 0 && !selectedHotel) {
+      const hotelId = Number(urlHotelId);
+      const hotel = hotels.find(h => h.ID === hotelId);
+      if (hotel) {
+        setSelectedHotel(hotel);
+      }
+    }
+  }, [urlHotelId, hotels, selectedHotel, setSelectedHotel]);
+
+  useEffect(() => {
+    // Re-fetch when hotel changes or URL hotel_id changes
     fetchPOIs();
-  }, [selectedHotel]);
+  }, [selectedHotel, urlHotelId]);
 
   const fetchPOIs = async () => {
     setLoading(true);
     try {
-      const url = selectedHotel 
-        ? `/pois?hotel_id=${selectedHotel.ID}` 
+      // Use selectedHotel first, then fallback to URL hotel_id
+      const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+      const url = hotelId 
+        ? `/pois?hotel_id=${hotelId}` 
         : '/pois';
       const response = await api.get(url);
       // Parse image_urls from JSON string if present
@@ -93,7 +112,9 @@ const POIs = () => {
       return;
     }
 
-    if (!selectedHotel) {
+    // Use selectedHotel first, then fallback to URL hotel_id
+    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+    if (!hotelId) {
       alert('Please select a hotel first');
       return;
     }
@@ -101,7 +122,7 @@ const POIs = () => {
     setSubmitting(true);
     try {
       const payload: any = {
-        hotel_id: selectedHotel.ID,
+        hotel_id: hotelId,
         title: formData.title,
         type: formData.type,
       };
@@ -368,15 +389,10 @@ const POIs = () => {
   }
 
   // --- LIST VIEW ---
-  if (loading) {
-    return (
-      <div className="p-8 text-center text-gray-500">
-        Loading POIs...
-      </div>
-    );
-  }
-
-  if (!selectedHotel) {
+  // Use selectedHotel first, then fallback to URL hotel_id
+  const effectiveHotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+  
+  if (!effectiveHotelId) {
     return (
       <div className="p-8 text-center">
         <p className="text-gray-500">Please select a hotel to manage POIs</p>
@@ -388,8 +404,11 @@ const POIs = () => {
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Points of Interest</h1>
-          <p className="text-gray-500 text-sm mt-1">Manage points of interest for {selectedHotel.name}</p>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+            <MapPin className="text-[#008491]" size={32} />
+            Points of Interest
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">Manage points of interest{selectedHotel ? ` for ${selectedHotel.name}` : ''}</p>
         </div>
         <button 
           onClick={() => setView('create')}
@@ -400,26 +419,30 @@ const POIs = () => {
         </button>
       </div>
 
-      {pois.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-700 mb-2">No POIs yet</h3>
-          <p className="text-gray-500 mb-6">Get started by adding your first point of interest</p>
-          <button
-            onClick={() => setView('create')}
-            className="bg-[#008491] text-white px-6 py-2.5 rounded-lg hover:bg-[#006a76] transition-all"
-          >
-            Add POI
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {pois.map((poi) => (
-            <div
-              key={poi.ID}
-              className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all"
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">Loading POIs...</div>
+        ) : pois.length === 0 ? (
+          <div className="text-center py-16">
+            <MapPin className="mx-auto text-gray-300 mb-3" size={48} />
+            <h3 className="text-lg font-medium text-gray-900">No POIs Found</h3>
+            <p className="text-gray-500 mb-4">Get started by adding your first point of interest.</p>
+            <button
+              onClick={() => setView('create')}
+              className="bg-[#008491] text-white px-6 py-2.5 rounded-lg hover:bg-[#006a76] transition-all"
             >
-              {poi.type === 'normal' && (() => {
+              Add POI
+            </button>
+          </div>
+        ) : (
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {pois.map((poi) => (
+                <div
+                  key={poi.ID}
+                  className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all"
+                >
+                  {poi.type === 'normal' && (() => {
                 const images = getImagesForPOI(poi);
                 if (images.length > 0) {
                   return (
@@ -441,8 +464,8 @@ const POIs = () => {
                   );
                 }
                 return null;
-              })()}
-              <div className="p-5">
+                  })()}
+                  <div className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <h3 className="text-lg font-semibold text-gray-800 flex-1">{poi.title}</h3>
                   <span className={`ml-2 px-2 py-1 rounded text-xs font-medium ${
@@ -498,10 +521,12 @@ const POIs = () => {
                   </button>
                 </div>
               </div>
+              </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

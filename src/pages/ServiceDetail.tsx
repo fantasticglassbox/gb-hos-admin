@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { Plus, Settings, Search, Filter } from 'lucide-react';
+import { Plus, Settings, Search, Filter, Edit2, Trash2 } from 'lucide-react';
 
 import type { Service, MenuItem, MenuCategory } from '../types';
 import Modal from '../components/Modal';
@@ -19,6 +19,7 @@ const ServiceDetail = () => {
   // Modal States
   const [showCatModal, setShowCatModal] = useState(false);
   const [showItemModal, setShowItemModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [activeCategory, setActiveCategory] = useState<number | undefined>(undefined);
   const [activeModifierItem, setActiveModifierItem] = useState<MenuItem | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -108,7 +109,27 @@ const ServiceDetail = () => {
       return;
     }
     setActiveCategory(catId || service.categories[0].ID);
+    setEditingItem(null);
     setShowItemModal(true);
+  };
+
+  const handleEditItem = (item: MenuItem) => {
+    setEditingItem(item);
+    setActiveCategory(item.categoryId);
+    setShowItemModal(true);
+  };
+
+  const handleDeleteItem = async (item: MenuItem) => {
+    if (!confirm(`Are you sure you want to delete "${item.name}"? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await api.delete(`/menu/items/${item.ID}`);
+      fetchService();
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      alert('Failed to delete item');
+    }
   };
 
   if (loading) return <div className="p-8 text-center text-gray-500">Loading service details...</div>;
@@ -222,8 +243,8 @@ const ServiceDetail = () => {
                 </div>
                 <p className="text-gray-500 text-sm mb-4 line-clamp-2 flex-1">{item.description}</p>
                 
-                <div className="mt-auto pt-4 border-t border-gray-50 flex justify-between items-center">
-                  <div className="flex gap-1.5 flex-wrap">
+                <div className="mt-auto pt-4 border-t border-gray-50">
+                  <div className="flex gap-1.5 flex-wrap mb-3">
                     {item.modifiers?.length > 0 ? (
                       <>
                         {item.modifiers.slice(0, 2).map(mod => (
@@ -242,13 +263,31 @@ const ServiceDetail = () => {
                     )}
                   </div>
                   
-                  <button 
-                    onClick={() => setActiveModifierItem(item)}
-                    className="p-2 text-gray-400 hover:text-[#008491] hover:bg-[#e0fbfc] rounded-lg transition-colors"
-                    title="Configure Modifiers"
-                  >
-                    <Settings size={18} />
-                  </button>
+                  <div className="flex justify-between items-center">
+                    <button 
+                      onClick={() => setActiveModifierItem(item)}
+                      className="p-2 text-gray-400 hover:text-[#008491] hover:bg-[#e0fbfc] rounded-lg transition-colors"
+                      title="Configure Modifiers"
+                    >
+                      <Settings size={18} />
+                    </button>
+                    <div className="flex gap-1">
+                      <button 
+                        onClick={() => handleEditItem(item)}
+                        className="p-2 text-gray-400 hover:text-[#008491] hover:bg-[#e0fbfc] rounded-lg transition-colors"
+                        title="Edit Item"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteItem(item)}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete Item"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -295,14 +334,15 @@ const ServiceDetail = () => {
 
       <Modal 
         isOpen={showItemModal} 
-        onClose={() => setShowItemModal(false)} 
-        title="Add New Menu Item"
+        onClose={() => { setShowItemModal(false); setEditingItem(null); }} 
+        title={editingItem ? "Edit Menu Item" : "Add New Menu Item"}
       >
         <MenuItemForm 
           categories={service.categories} 
           initialCategoryId={activeCategory} 
-          onSuccess={() => { setShowItemModal(false); fetchService(); }} 
-          onCancel={() => setShowItemModal(false)}
+          editingItem={editingItem}
+          onSuccess={() => { setShowItemModal(false); setEditingItem(null); fetchService(); }} 
+          onCancel={() => { setShowItemModal(false); setEditingItem(null); }}
         />
       </Modal>
 

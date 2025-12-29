@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { format } from 'date-fns';
-import { Clock, CheckCircle, XCircle, AlertCircle, Package } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, AlertCircle, Package, ShoppingCart } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
 import type { ModifierOption } from '../types';
 
@@ -129,10 +129,18 @@ const Orders = () => {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Order Management</h1>
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+            <ShoppingCart className="text-[#008491]" size={32} />
+            Order Management
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">Manage guest orders and service requests</p>
+        </div>
+      </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
         <div className="flex border-b border-gray-200">
           {tabs.map((tab) => (
             <button
@@ -159,16 +167,22 @@ const Orders = () => {
         </div>
       </div>
 
-      {loading ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500">Loading orders...</p>
-        </div>
-      ) : filteredOrders.length === 0 ? (
-        <div className="bg-white p-8 rounded-xl text-center text-gray-500 border border-gray-100">
-          No {activeTab === 'all' ? '' : activeTab === 'new' ? 'new' : activeTab} orders found.
-        </div>
-      ) : (
-        <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">Loading orders...</div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="text-center py-16">
+            <ShoppingCart className="mx-auto text-gray-300 mb-3" size={48} />
+            <h3 className="text-lg font-medium text-gray-900">No Orders Found</h3>
+            <p className="text-gray-500 mb-4">
+              {activeTab === 'all' 
+                ? 'No orders have been placed yet.' 
+                : `No ${activeTab === 'new' ? 'new' : activeTab} orders found.`}
+            </p>
+          </div>
+        ) : (
+          <div className="p-6">
+            <div className="space-y-4">
           {filteredOrders.map((order) => (
             <div key={order.ID} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <div className="flex justify-between items-start border-b border-gray-100 pb-4 mb-4">
@@ -263,9 +277,11 @@ const Orders = () => {
                 )}
               </div>
             </div>
-          ))}
-        </div>
-      )}
+            ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

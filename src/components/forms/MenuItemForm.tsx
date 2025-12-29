@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../../services/api';
-import type { Service } from '../../types';
+import type { Service, MenuItem } from '../../types';
 import ImageUpload from '../ImageUpload';
 
 interface MenuItemFormProps {
   categories: Service['categories'];
   initialCategoryId?: number;
+  editingItem?: MenuItem | null;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
-const MenuItemForm = ({ categories, initialCategoryId, onSuccess, onCancel }: MenuItemFormProps) => {
+const MenuItemForm = ({ categories, initialCategoryId, editingItem, onSuccess, onCancel }: MenuItemFormProps) => {
   const [loading, setLoading] = useState(false);
   const [categoryId, setCategoryId] = useState<number>(initialCategoryId || (categories[0]?.ID || 0));
   const [newItem, setNewItem] = useState({ 
@@ -19,6 +20,21 @@ const MenuItemForm = ({ categories, initialCategoryId, onSuccess, onCancel }: Me
     price: 0, 
     image_url: '' 
   });
+
+  useEffect(() => {
+    if (editingItem) {
+      setNewItem({
+        name: editingItem.name || '',
+        description: editingItem.description || '',
+        price: editingItem.price || 0,
+        image_url: editingItem.image_url || ''
+      });
+      setCategoryId(editingItem.categoryId || initialCategoryId || categories[0]?.ID || 0);
+    } else {
+      setNewItem({ name: '', description: '', price: 0, image_url: '' });
+      setCategoryId(initialCategoryId || categories[0]?.ID || 0);
+    }
+  }, [editingItem, initialCategoryId, categories]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,15 +45,22 @@ const MenuItemForm = ({ categories, initialCategoryId, onSuccess, onCancel }: Me
 
     setLoading(true);
     try {
-      await api.post('/menu/items', {
-        category_id: categoryId,
-        ...newItem
-      });
+      if (editingItem) {
+        await api.put(`/menu/items/${editingItem.ID}`, {
+          category_id: categoryId,
+          ...newItem
+        });
+      } else {
+        await api.post('/menu/items', {
+          category_id: categoryId,
+          ...newItem
+        });
+      }
       setNewItem({ name: '', description: '', price: 0, image_url: '' });
       onSuccess();
     } catch (error) {
       console.error(error);
-      alert('Failed to create item');
+      alert(editingItem ? 'Failed to update item' : 'Failed to create item');
     } finally {
       setLoading(false);
     }
@@ -102,6 +125,8 @@ const MenuItemForm = ({ categories, initialCategoryId, onSuccess, onCancel }: Me
           value={newItem.image_url}
           onChange={(url) => setNewItem({...newItem, image_url: url})}
           label=""
+          accept="image/png,image/jpeg,image/jpg"
+          allowedTypes={['png', 'jpeg', 'jpg']}
         />
       </div>
 
@@ -119,7 +144,7 @@ const MenuItemForm = ({ categories, initialCategoryId, onSuccess, onCancel }: Me
           className="px-6 py-2 bg-[#008491] text-white rounded-lg hover:bg-[#006a76] disabled:bg-gray-400"
           disabled={loading}
         >
-          {loading ? 'Creating...' : 'Add Item'}
+          {loading ? (editingItem ? 'Updating...' : 'Creating...') : (editingItem ? 'Update Item' : 'Add Item')}
         </button>
       </div>
     </form>

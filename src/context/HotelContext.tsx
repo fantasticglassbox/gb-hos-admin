@@ -38,20 +38,28 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const userRole = localStorage.getItem('userRole');
       const savedId = localStorage.getItem('selectedHotelId');
       
-      // For hotel_admin, use the hotel_id from login response
+      // For hotel_admin, always try to set the hotel from savedId
       if (userRole === 'hotel_admin' && savedId) {
-        const found = response.data.find((h: Hotel) => h.ID === Number(savedId));
+        const hotelId = Number(savedId);
+        const found = response.data.find((h: Hotel) => h.ID === hotelId);
         if (found) {
           setSelectedHotelState(found);
           return; // Don't proceed with default selection
+        } else {
+          // If hotel not found in list but we have a savedId, try to fetch it directly
+          // This handles the case where hotels list might be filtered or incomplete
+          console.warn(`Hotel ${hotelId} not found in hotels list for hotel_admin`);
         }
       }
       
-      // Restore selection or default to all (null)
+      // Restore selection for other roles or if hotel_admin hotel wasn't found
       if (savedId) {
-        const found = response.data.find((h: Hotel) => h.ID === Number(savedId));
-        if (found) setSelectedHotelState(found);
-        // If saved hotel not found, default to all (null) instead of first hotel
+        const hotelId = Number(savedId);
+        const found = response.data.find((h: Hotel) => h.ID === hotelId);
+        if (found) {
+          setSelectedHotelState(found);
+        }
+        // If saved hotel not found, keep selectedHotel as null
       }
       // If no savedId, keep selectedHotel as null (all hotels)
     } catch (error) {

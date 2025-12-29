@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { Plus, Edit2, Trash2, ArrowLeft, DoorOpen, Upload, Download, X, AlertCircle, CheckCircle } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
@@ -6,7 +7,8 @@ import Modal from '../components/Modal';
 import type { Room } from '../types';
 
 const Rooms = () => {
-  const { selectedHotel } = useHotel();
+  const { selectedHotel, hotels, setSelectedHotel } = useHotel();
+  const [searchParams] = useSearchParams();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
@@ -28,17 +30,36 @@ const Rooms = () => {
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Get hotel_id from URL query params as fallback
+  const urlHotelId = searchParams.get('hotel_id');
+
+  // Set hotel from URL if not already selected
   useEffect(() => {
-    if (selectedHotel) {
+    if (urlHotelId && hotels.length > 0 && !selectedHotel) {
+      const hotelId = Number(urlHotelId);
+      const hotel = hotels.find(h => h.ID === hotelId);
+      if (hotel) {
+        setSelectedHotel(hotel);
+      }
+    }
+  }, [urlHotelId, hotels, selectedHotel, setSelectedHotel]);
+
+  useEffect(() => {
+    // Re-fetch when hotel changes or URL hotel_id changes
+    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+    if (hotelId) {
       fetchRooms();
     }
-  }, [selectedHotel]);
+  }, [selectedHotel, urlHotelId]);
 
   const fetchRooms = async () => {
-    if (!selectedHotel) return;
+    // Use selectedHotel first, then fallback to URL hotel_id
+    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+    if (!hotelId) return;
+    
     try {
       setLoading(true);
-      const response = await api.get(`/rooms?hotel_id=${selectedHotel.ID}`);
+      const response = await api.get(`/rooms?hotel_id=${hotelId}`);
       setRooms(response.data);
     } catch (error) {
       console.error('Error fetching rooms:', error);
@@ -49,13 +70,15 @@ const Rooms = () => {
 
   const handleAddRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedHotel) return alert('Please select a hotel first');
+    // Use selectedHotel first, then fallback to URL hotel_id
+    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+    if (!hotelId) return alert('Please select a hotel first');
     
     setSubmitting(true);
     try {
       await api.post('/rooms', {
         ...newRoom,
-        hotel_id: selectedHotel.ID,
+        hotel_id: hotelId,
         price: Number(newRoom.price),
         floor_no: Number(newRoom.floor_no)
       });
@@ -151,7 +174,9 @@ const Rooms = () => {
   };
 
   const handleBulkUpload = async () => {
-    if (!selectedHotel) {
+    // Use selectedHotel first, then fallback to URL hotel_id
+    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+    if (!hotelId) {
       setUploadError('Please select a hotel first');
       return;
     }
@@ -169,7 +194,7 @@ const Rooms = () => {
       const formData = new FormData();
       formData.append('file', uploadFile);
 
-      const response = await api.post(`/rooms/bulk-upload?hotel_id=${selectedHotel.ID}`, formData, {
+      const response = await api.post(`/rooms/bulk-upload?hotel_id=${hotelId}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -439,7 +464,10 @@ const Rooms = () => {
     <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Room Management</h1>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+            <DoorOpen className="text-[#008491]" size={32} />
+            Room Management
+          </h1>
           <p className="text-gray-500 text-sm mt-1">Manage hotel rooms and availability</p>
         </div>
         <div className="flex gap-3">
@@ -448,7 +476,7 @@ const Rooms = () => {
               resetBulkUpload();
               setShowBulkUploadModal(true);
             }}
-            disabled={!selectedHotel}
+            disabled={!selectedHotel && !urlHotelId}
             className="bg-gray-100 text-gray-700 px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-gray-200 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Upload size={20} />
@@ -456,7 +484,7 @@ const Rooms = () => {
           </button>
           <button 
             onClick={() => setView('create')}
-            disabled={!selectedHotel}
+            disabled={!selectedHotel && !urlHotelId}
             className="bg-[#008491] text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-[#006a76] shadow-md shadow-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={20} />
@@ -465,31 +493,36 @@ const Rooms = () => {
         </div>
       </div>
 
-      {!selectedHotel && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-          <p className="text-yellow-800 text-sm">Please select a hotel first to manage rooms.</p>
-        </div>
-      )}
+      {(() => {
+        // Use selectedHotel first, then fallback to URL hotel_id
+        const effectiveHotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+        if (!effectiveHotelId) {
+          return (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <p className="text-yellow-800 text-sm">Please select a hotel first to manage rooms.</p>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
-      {loading ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500">Loading rooms...</p>
-        </div>
-      ) : rooms.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          <DoorOpen className="mx-auto text-gray-300 mb-4" size={64} />
-          <h3 className="text-lg font-semibold text-gray-700 mb-2">No rooms found</h3>
-          <p className="text-gray-500 mb-6">Get started by adding your first room</p>
-          <button 
-            onClick={() => setView('create')}
-            disabled={!selectedHotel}
-            className="bg-[#008491] text-white px-5 py-2.5 rounded-lg hover:bg-[#006a76] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Add Room
-          </button>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {loading ? (
+          <div className="text-center py-12 text-gray-500">Loading rooms...</div>
+        ) : rooms.length === 0 ? (
+          <div className="text-center py-16">
+            <DoorOpen className="mx-auto text-gray-300 mb-3" size={48} />
+            <h3 className="text-lg font-medium text-gray-900">No Rooms Found</h3>
+            <p className="text-gray-500 mb-4">Get started by adding your first room.</p>
+            <button 
+              onClick={() => setView('create')}
+              disabled={!selectedHotel && !urlHotelId}
+              className="bg-[#008491] text-white px-6 py-2.5 rounded-lg hover:bg-[#006a76] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            >
+              Add Room
+            </button>
+          </div>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
@@ -554,8 +587,8 @@ const Rooms = () => {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <Modal
         isOpen={showDeleteModal}

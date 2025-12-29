@@ -6,15 +6,38 @@ interface ImageUploadProps {
   value: string;
   onChange: (url: string) => void;
   label?: string;
+  accept?: string;
+  allowedTypes?: string[];
 }
 
-const ImageUpload = ({ value, onChange, label = "Media" }: ImageUploadProps) => {
+const ImageUpload = ({ value, onChange, label = "Media", accept = "image/*,video/*", allowedTypes }: ImageUploadProps) => {
   const [uploading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Validate file type if allowedTypes is specified
+    if (allowedTypes && allowedTypes.length > 0) {
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      const mimeType = file.type.toLowerCase();
+      
+      const isValidType = allowedTypes.some(type => {
+        const normalizedType = type.toLowerCase();
+        return fileExtension === normalizedType || 
+               mimeType === `image/${normalizedType}` ||
+               mimeType === `image/${normalizedType === 'jpg' ? 'jpeg' : normalizedType}`;
+      });
+
+      if (!isValidType) {
+        alert(`Invalid file type. Please upload only: ${allowedTypes.join(', ').toUpperCase()}`);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
+    }
 
     setLoading(true);
     const formData = new FormData();
@@ -89,7 +112,11 @@ const ImageUpload = ({ value, onChange, label = "Media" }: ImageUploadProps) => 
             <div className="flex flex-col items-center text-gray-500">
               <Upload size={24} className="mb-2" />
               <span className="text-sm font-medium">Click to upload media</span>
-              <span className="text-xs text-gray-400 mt-1">Images or Video (MP4, WebM)</span>
+              <span className="text-xs text-gray-400 mt-1">
+                {allowedTypes && allowedTypes.length > 0 
+                  ? `Images only (${allowedTypes.map(t => t.toUpperCase()).join(', ')})`
+                  : 'Images or Video (MP4, WebM)'}
+              </span>
             </div>
           )}
         </div>
@@ -99,7 +126,7 @@ const ImageUpload = ({ value, onChange, label = "Media" }: ImageUploadProps) => 
         ref={fileInputRef}
         type="file"
         className="hidden"
-        accept="image/*,video/*"
+        accept={accept}
         onChange={handleFileSelect}
       />
     </div>
