@@ -154,6 +154,8 @@ const Users = () => {
         return <UserCog size={16} className="text-blue-600" />;
       case 'hotel_reception':
         return <UserCheck size={16} className="text-green-600" />;
+      case 'service_reception':
+        return <UserCheck size={16} className="text-orange-600" />;
       case 'hotel_guest':
         return <User size={16} className="text-gray-600" />;
       default:
@@ -169,6 +171,8 @@ const Users = () => {
         return 'bg-blue-100 text-blue-700';
       case 'hotel_reception':
         return 'bg-green-100 text-green-700';
+      case 'service_reception':
+        return 'bg-orange-100 text-orange-700';
       case 'hotel_guest':
         return 'bg-gray-100 text-gray-700';
       default:
@@ -250,6 +254,7 @@ const Users = () => {
                   <option value="admin">Admin (Internal Admin)</option>
                   <option value="hotel_admin">Hotel Admin</option>
                   <option value="hotel_reception">Hotel Reception</option>
+                  <option value="service_reception">Service Reception (Orders Only)</option>
                   <option value="hotel_guest" disabled={!editingUser}>Hotel Guest (Auto-created)</option>
                 </select>
                 {formData.role === 'hotel_guest' && (
@@ -354,6 +359,7 @@ const Users = () => {
               <option value="admin">Admin</option>
               <option value="hotel_admin">Hotel Admin</option>
               <option value="hotel_reception">Hotel Reception</option>
+              <option value="service_reception">Service Reception</option>
               <option value="hotel_guest">Hotel Guest</option>
             </select>
           </div>
