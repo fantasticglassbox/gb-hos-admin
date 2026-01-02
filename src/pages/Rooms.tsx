@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Plus, Edit2, Trash2, ArrowLeft, DoorOpen, Upload, Download, X, AlertCircle, CheckCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, ArrowLeft, DoorOpen, Upload, Download, X, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
 import Modal from '../components/Modal';
-import type { Room } from '../types';
+import type { Room, Device } from '../types';
 
 const Rooms = () => {
   const { selectedHotel, hotels, setSelectedHotel } = useHotel();
   const [searchParams] = useSearchParams();
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
   const [newRoom, setNewRoom] = useState({ 
@@ -59,8 +60,12 @@ const Rooms = () => {
     
     try {
       setLoading(true);
-      const response = await api.get(`/rooms?hotel_id=${hotelId}`);
-      setRooms(response.data);
+      const [roomsResponse, devicesResponse] = await Promise.all([
+        api.get(`/rooms?hotel_id=${hotelId}`),
+        api.get(`/devices?hotel_id=${hotelId}`)
+      ]);
+      setRooms(roomsResponse.data);
+      setDevices(devicesResponse.data || []);
     } catch (error) {
       console.error('Error fetching rooms:', error);
     } finally {
@@ -129,6 +134,31 @@ const Rooms = () => {
       console.error('Error deleting room:', error);
       alert('Failed to delete room');
     }
+  };
+
+  const handleClearDevice = async (roomId: number) => {
+    // Find device assigned to this room
+    const device = devices.find(d => d.room_id === roomId);
+    if (!device) {
+      alert('No device assigned to this room');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to clear the device "${device.name}" from Room ${rooms.find(r => r.ID === roomId)?.number}?`)) {
+      return;
+    }
+
+    try {
+      await api.patch(`/devices/${device.ID}/clear-room`);
+      fetchRooms(); // Refresh to update device list
+    } catch (error) {
+      console.error('Error clearing device from room:', error);
+      alert('Failed to clear device from room');
+    }
+  };
+
+  const getDeviceForRoom = (roomId: number): Device | undefined => {
+    return devices.find(d => d.room_id === roomId);
   };
 
   const getStatusColor = (status: string) => {
@@ -532,6 +562,7 @@ const Rooms = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Floor</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -557,6 +588,26 @@ const Rooms = () => {
                       <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(room.status)}`}>
                         {room.status}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {(() => {
+                        const device = getDeviceForRoom(room.ID);
+                        if (device) {
+                          return (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-700">{device.name}</span>
+                              <button
+                                onClick={() => handleClearDevice(room.ID)}
+                                className="text-orange-500 hover:text-orange-700 p-1 rounded hover:bg-orange-50 transition-colors"
+                                title="Clear Device"
+                              >
+                                <XCircle size={16} />
+                              </button>
+                            </div>
+                          );
+                        }
+                        return <span className="text-sm text-gray-400">No device</span>;
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end gap-2">
