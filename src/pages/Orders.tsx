@@ -11,6 +11,13 @@ interface OrderItem {
     name: string;
     type: string;
   };
+  menu_item?: {
+    ID: number;
+    name: string;
+    description: string;
+    price: number;
+    image_url: string;
+  };
   quantity: number;
   price: number;
   notes: string;
@@ -212,7 +219,12 @@ const Orders = () => {
                           <span className="font-bold text-gray-900 text-xs">{item.quantity}</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-gray-900 font-semibold text-sm mb-1">{item.service.name}</div>
+                          <div className="text-gray-900 font-semibold text-sm mb-1">
+                            {item.menu_item?.name || item.service.name}
+                          </div>
+                          {item.menu_item?.description && (
+                            <div className="text-xs text-gray-500 mb-1">{item.menu_item.description}</div>
+                          )}
                           {item.modifier_options && item.modifier_options.length > 0 && (
                             <div className="mt-1.5 ml-0 space-y-0.5">
                               {item.modifier_options.map((option) => (
