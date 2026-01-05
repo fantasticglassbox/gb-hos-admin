@@ -53,6 +53,7 @@ export interface Device {
 
 export interface Facility {
   ID: number;
+  hotel_id: number;
   name: string;
   image_url: string; // Deprecated, kept for backward compatibility
   image_urls?: string[]; // Array of image URLs

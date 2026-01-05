@@ -418,10 +418,24 @@ const Facilities = () => {
             Facilities
           </h1>
           <p className="text-gray-500 text-sm mt-1">Manage hotel facilities (Gym, Pool, Spa, etc.)</p>
+          {selectedHotel && (
+            <div className="text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-100 mt-2 inline-block">
+              <span className="font-medium text-blue-900">Showing facilities for:</span>{' '}
+              <span className="font-semibold text-blue-700">{selectedHotel.name}</span>
+            </div>
+          )}
         </div>
         <button 
-          onClick={() => setView('create')}
-          className="bg-[#008491] text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-[#006a76] shadow-md shadow-gray-200 transition-all"
+          onClick={() => {
+            const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
+            if (!hotelId) {
+              alert('Please select a hotel first to add facilities');
+              return;
+            }
+            setView('create');
+          }}
+          disabled={!selectedHotel && !urlHotelId}
+          className="bg-[#008491] text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-[#006a76] shadow-md shadow-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus size={20} />
           Add Facility
@@ -435,13 +449,19 @@ const Facilities = () => {
           <div className="text-center py-16">
             <Dumbbell className="mx-auto text-gray-300 mb-3" size={48} />
             <h3 className="text-lg font-medium text-gray-900">No Facilities Found</h3>
-            <p className="text-gray-500 mb-4">Get started by adding your first facility.</p>
-            <button
-              onClick={() => setView('create')}
-              className="bg-[#008491] text-white px-6 py-2.5 rounded-lg hover:bg-[#006a76] transition-all"
-            >
-              Add Facility
-            </button>
+            <p className="text-gray-500 mb-4">
+              {selectedHotel || urlHotelId 
+                ? `No facilities found for this hotel. Get started by adding your first facility.`
+                : 'Please select a hotel to view or add facilities.'}
+            </p>
+            {(selectedHotel || urlHotelId) && (
+              <button
+                onClick={() => setView('create')}
+                className="bg-[#008491] text-white px-6 py-2.5 rounded-lg hover:bg-[#006a76] transition-all"
+              >
+                Add Facility
+              </button>
+            )}
           </div>
         ) : (
           <div className="p-6">

@@ -68,7 +68,28 @@ export const HotelProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   useEffect(() => {
-    fetchHotels();
+    // Only fetch hotels if user is logged in (has token)
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetchHotels();
+    }
+  }, []);
+
+  // Listen for storage changes (e.g., when user logs in from another tab/window)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token' && e.newValue) {
+        // Token was added, fetch hotels
+        fetchHotels();
+      } else if (e.key === 'token' && !e.newValue) {
+        // Token was removed, clear hotels
+        setHotels([]);
+        setSelectedHotelState(null);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   return (

@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { useHotel } from '../context/HotelContext';
 import { Lock, Mail } from 'lucide-react';
 import logo from '../assets/logo.svg';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { fetchHotels } = useHotel();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -29,6 +31,9 @@ const Login = () => {
       if (response.data.role === 'hotel_admin' && response.data.hotel_id) {
         localStorage.setItem('selectedHotelId', response.data.hotel_id.toString());
       }
+      
+      // Fetch hotels after successful login
+      await fetchHotels();
       
       navigate('/');
     } catch (err) {
