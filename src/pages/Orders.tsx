@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { format } from 'date-fns';
+import { format, startOfDay, subDays } from 'date-fns';
 import { Clock, CheckCircle, XCircle, AlertCircle, Package, ShoppingCart } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
 import type { ModifierOption } from '../types';
@@ -39,25 +39,38 @@ interface Order {
 
 type OrderTab = 'all' | 'new' | 'in_progress' | 'completed' | 'cancelled';
 
+function defaultDateRange() {
+  const end = startOfDay(new Date());
+  const start = subDays(end, 6);
+  return {
+    start: format(start, 'yyyy-MM-dd'),
+    end: format(end, 'yyyy-MM-dd'),
+  };
+}
+
 const Orders = () => {
   const { selectedHotel } = useHotel();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<OrderTab>('all');
+  const defaults = defaultDateRange();
+  const [startDate, setStartDate] = useState(defaults.start);
+  const [endDate, setEndDate] = useState(defaults.end);
 
   useEffect(() => {
     fetchOrders();
     // Poll for new orders every 30 seconds
     const interval = setInterval(fetchOrders, 30000);
     return () => clearInterval(interval);
-  }, [selectedHotel]);
+  }, [selectedHotel, startDate, endDate]);
 
   const fetchOrders = async () => {
     try {
-      const url = selectedHotel 
-        ? `/orders?hotel_id=${selectedHotel.ID}` 
-        : '/orders';
-      const response = await api.get(url);
+      const params = new URLSearchParams();
+      if (selectedHotel) params.set('hotel_id', String(selectedHotel.ID));
+      params.set('start_date', startDate);
+      params.set('end_date', endDate);
+      const response = await api.get(`/orders?${params.toString()}`);
       // Sort by newest first
       const sortedOrders = response.data.sort((a: Order, b: Order) => 
         new Date(b.CreatedAt).getTime() - new Date(a.CreatedAt).getTime()
@@ -134,6 +147,12 @@ const Orders = () => {
     { key: 'cancelled', label: 'Cancelled', count: orders.filter(o => o.status.toLowerCase() === 'cancelled').length },
   ];
 
+  const resetDateRange = () => {
+    const d = defaultDateRange();
+    setStartDate(d.start);
+    setEndDate(d.end);
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
@@ -144,6 +163,40 @@ const Orders = () => {
           </h1>
           <p className="text-gray-500 text-sm mt-1">Manage guest orders and service requests</p>
         </div>
+      </div>
+
+      {/* Date filter (default: last 7 days) */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6 flex flex-wrap items-end gap-4">
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">From</label>
+          <input
+            type="date"
+            value={startDate}
+            max={endDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#008491]/30 focus:border-[#008491] outline-none"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">To</label>
+          <input
+            type="date"
+            value={endDate}
+            min={startDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#008491]/30 focus:border-[#008491] outline-none"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={resetDateRange}
+          className="px-4 py-2 text-sm font-medium text-[#008491] border border-[#008491]/40 rounded-lg hover:bg-[#008491]/5 transition-colors"
+        >
+          Last 7 days
+        </button>
+        <p className="text-xs text-gray-400 pb-2 flex-1 min-w-[200px]">
+          Showing orders from the selected range (default: today back 7 days).
+        </p>
       </div>
 
       {/* Tabs */}

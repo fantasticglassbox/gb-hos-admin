@@ -13,7 +13,7 @@ import {
   Clock,
   AlertCircle
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, startOfDay, subDays } from 'date-fns';
 import {
   BarChart,
   Bar,
@@ -87,9 +87,16 @@ const Dashboard = () => {
       setLoading(true);
       setError(null);
       const hotelIdParam = selectedHotel ? `?hotel_id=${selectedHotel.ID}` : '';
+      const end = startOfDay(new Date());
+      const start = subDays(end, 6);
+      const orderParams = new URLSearchParams();
+      if (selectedHotel) orderParams.set('hotel_id', String(selectedHotel.ID));
+      orderParams.set('start_date', format(start, 'yyyy-MM-dd'));
+      orderParams.set('end_date', format(end, 'yyyy-MM-dd'));
+      const ordersQuery = `?${orderParams.toString()}`;
       const [statsResponse, ordersResponse, checkInsResponse] = await Promise.all([
         api.get(`/dashboard/stats${hotelIdParam}`),
-        api.get(`/orders${hotelIdParam}`),
+        api.get(`/orders${ordersQuery}`),
         api.get(`/checkins${hotelIdParam}`)
       ]);
 
