@@ -178,6 +178,7 @@ const Services = () => {
                   <option value="massage">Massage & Spa</option>
                   <option value="laundry">Laundry</option>
                   <option value="cleaning">Cleaning</option>
+                  <option value="loss_breakage">Loss & Breakage</option>
                   <option value="other">Other</option>
                 </select>
               </div>
