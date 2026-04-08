@@ -10,6 +10,8 @@ interface Service {
   ID: number;
   name: string;
   type: string;
+  sort_order: number;
+  allow_order: number;
   price: number;
   description: string;
   image_url?: string;
@@ -22,10 +24,10 @@ const Services = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'create'>('list');
-  const [newService, setNewService] = useState({ name: '', type: 'food', price: 0, description: '', image_url: '' });
+  const [newService, setNewService] = useState({ name: '', type: 'food', sort_order: 0, allow_order: 1, price: 0, description: '', image_url: '' });
   const [submitting, setSubmitting] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
-  const [editFormData, setEditFormData] = useState({ name: '', type: 'food', price: 0, description: '', image_url: '' });
+  const [editFormData, setEditFormData] = useState({ name: '', type: 'food', sort_order: 0, allow_order: 1, price: 0, description: '', image_url: '' });
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Get hotel_id from URL query params as fallback
@@ -60,7 +62,12 @@ const Services = () => {
         return;
       }
       const response = await api.get(`/services?hotel_id=${hotelId}`);
-      setServices(response.data);
+      setServices(
+        (response.data as Service[]).map((service) => ({
+          ...service,
+          allow_order: service.allow_order === 0 ? 0 : 1,
+        }))
+      );
     } catch (error) {
       console.error('Error fetching services:', error);
     } finally {
@@ -78,10 +85,12 @@ const Services = () => {
     try {
       await api.post('/services', {
         ...newService,
+        sort_order: Number(newService.sort_order) || 0,
+        allow_order: newService.allow_order === 0 ? 0 : 1,
         price: Number(newService.price),
         hotel_id: hotelId
       });
-      setNewService({ name: '', type: 'food', price: 0, description: '', image_url: '' });
+      setNewService({ name: '', type: 'food', sort_order: 0, allow_order: 1, price: 0, description: '', image_url: '' });
       setView('list');
       fetchServices();
     } catch (error) {
@@ -96,6 +105,8 @@ const Services = () => {
     setEditFormData({
       name: service.name,
       type: service.type,
+      sort_order: service.sort_order || 0,
+      allow_order: service.allow_order === 0 ? 0 : 1,
       price: service.price,
       description: service.description,
       image_url: service.image_url || '',
@@ -110,6 +121,8 @@ const Services = () => {
     try {
       await api.put(`/services/${editingService.ID}`, {
         ...editFormData,
+        sort_order: Number(editFormData.sort_order) || 0,
+        allow_order: editFormData.allow_order === 0 ? 0 : 1,
         price: Number(editFormData.price),
       });
       setEditingService(null);
@@ -182,19 +195,34 @@ const Services = () => {
                   <option value="other">Other</option>
                 </select>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Base Price (Optional)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-3.5 text-gray-500">Rp</span>
-                <input 
-                  type="number" 
-                  className="w-full border p-3 pl-10 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
-                  value={newService.price}
-                  onChange={(e) => setNewService({...newService, price: Number(e.target.value)})}
-                  placeholder="0"
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Display Position</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
+                  value={newService.sort_order}
+                  onChange={(e) => setNewService({...newService, sort_order: Number(e.target.value)})}
+                  placeholder="0 = auto append"
                 />
+                <p className="text-xs text-gray-500 mt-1">Lower number appears first. Use 0 to auto-append.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Allow Order</label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-[#008491] focus:ring-[#008491]"
+                    checked={newService.allow_order === 1}
+                    onChange={(e) =>
+                      setNewService({
+                        ...newService,
+                        allow_order: e.target.checked ? 1 : 0,
+                      })
+                    }
+                  />
+                  Guests can add items from this service menu
+                </label>
               </div>
             </div>
 
@@ -309,10 +337,11 @@ const Services = () => {
             <table className="w-full text-left">
               <thead className="bg-gray-50 text-gray-600 font-medium border-b border-gray-100">
                 <tr>
-                  <th className="p-5 w-20">Image</th>
                   <th className="p-5 w-1/4">Name</th>
+                  <th className="p-5 w-20">Image</th>
+                  <th className="p-5">Position</th>
+                  <th className="p-5">Allow Order</th>
                   <th className="p-5">Type</th>
-                  <th className="p-5">Base Price</th>
                   <th className="p-5 w-1/3">Description</th>
                   <th className="p-5 text-right">Actions</th>
                 </tr>
@@ -320,6 +349,7 @@ const Services = () => {
               <tbody className="divide-y divide-gray-100">
                 {services.map((service) => (
                   <tr key={service.ID} className="hover:bg-gray-50 transition-colors group">
+                    <td className="p-5 font-medium text-gray-900">{service.name}</td>
                     <td className="p-5">
                     {service.image_url ? (
                       <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
@@ -340,13 +370,23 @@ const Services = () => {
                       </div>
                     )}
                     </td>
-                    <td className="p-5 font-medium text-gray-900">{service.name}</td>
+                    <td className="p-5 text-gray-700 font-semibold">{service.sort_order ?? 0}</td>
+                    <td className="p-5">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                          service.allow_order !== 0
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {service.allow_order !== 0 ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </td>
                     <td className="p-5">
                       <span className="px-2.5 py-1 bg-[#e0fbfc] text-[#006a76] rounded-full text-xs font-bold uppercase tracking-wide">
                         {service.type}
                       </span>
                     </td>
-                    <td className="p-5 text-gray-600">Rp {service.price.toLocaleString()}</td>
                     <td className="p-5 text-gray-500 text-sm max-w-xs truncate">{service.description}</td>
                     <td className="p-5 text-right">
                     <div className="flex gap-2 justify-end opacity-60 group-hover:opacity-100 transition-opacity">
@@ -414,19 +454,34 @@ const Services = () => {
                 <option value="other">Other</option>
               </select>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Base Price (Optional)</label>
-            <div className="relative">
-              <span className="absolute left-3 top-3.5 text-gray-500">Rp</span>
-              <input 
-                type="number" 
-                className="w-full border p-3 pl-10 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
-                value={editFormData.price}
-                onChange={(e) => setEditFormData({...editFormData, price: Number(e.target.value)})}
-                placeholder="0"
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Display Position</label>
+              <input
+                type="number"
+                min={0}
+                className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
+                value={editFormData.sort_order}
+                onChange={(e) => setEditFormData({...editFormData, sort_order: Number(e.target.value)})}
+                placeholder="0 = auto append"
               />
+              <p className="text-xs text-gray-500 mt-1">Lower number appears first.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Allow Order</label>
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 text-[#008491] focus:ring-[#008491]"
+                  checked={editFormData.allow_order === 1}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      allow_order: e.target.checked ? 1 : 0,
+                    })
+                  }
+                />
+                Guests can add items from this service menu
+              </label>
             </div>
           </div>
 
