@@ -1,145 +1,104 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Plus, Trash2, ArrowLeft, Image as ImageIcon, Edit, X, Clock, ChevronLeft, ChevronRight, Dumbbell } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Image as ImageIcon, Edit2, X, Clock, Dumbbell, Search } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { useHotel } from '../context/HotelContext';
+import DataTable, { type Column } from '../components/DataTable';
+import Pagination from '../components/Pagination';
+import { useServerPagination } from '../hooks/useServerPagination';
 import type { Facility } from '../types';
+
+const emptyForm = { name: '', image_url: '', image_urls: [] as string[], opening_time: '', closing_time: '', description: '' };
 
 const Facilities = () => {
   const { selectedHotel, hotels, setSelectedHotel } = useHotel();
   const [searchParams] = useSearchParams();
-  const [facilities, setFacilities] = useState<Facility[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  // View State: 'list' | 'create' | 'edit'
   const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
-  
-  // Form State
-  const [formData, setFormData] = useState({ 
-    name: '', 
-    image_url: '', // For backward compatibility
-    image_urls: [] as string[],
-    opening_time: '',
-    closing_time: '',
-    description: '',
-  });
+  const [formData, setFormData] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState<{ [key: number]: number }>({});
+  // IDs of facility rows whose description is currently expanded.
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
 
-  // Get hotel_id from URL query params as fallback
+  const toggleExpanded = (id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   const urlHotelId = searchParams.get('hotel_id');
+  const hotelId = selectedHotel?.ID ?? (urlHotelId ? Number(urlHotelId) : null);
 
-  // Set hotel from URL if not already selected
   useEffect(() => {
     if (urlHotelId && hotels.length > 0 && !selectedHotel) {
-      const hotelId = Number(urlHotelId);
-      const hotel = hotels.find(h => h.ID === hotelId);
-      if (hotel) {
-        setSelectedHotel(hotel);
-      }
+      const h = hotels.find((x) => x.ID === Number(urlHotelId));
+      if (h) setSelectedHotel(h);
     }
   }, [urlHotelId, hotels, selectedHotel, setSelectedHotel]);
 
-  useEffect(() => {
-    // Re-fetch when hotel changes or URL hotel_id changes
-    fetchFacilities();
-  }, [selectedHotel, urlHotelId]);
+  const extraParams = useMemo(
+    () => (hotelId ? { hotel_id: hotelId } : {}),
+    [hotelId],
+  );
 
-  const fetchFacilities = async () => {
-    setLoading(true);
-    try {
-      // Use selectedHotel first, then fallback to URL hotel_id
-      const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
-      const url = hotelId 
-        ? `/facilities?hotel_id=${hotelId}` 
-        : '/facilities';
-      const response = await api.get(url);
-      // Parse image_urls from JSON string if present
-      const facilitiesWithParsedUrls = response.data.map((facility: any) => {
-        let imageUrls: string[] = [];
-        if (facility.image_urls) {
-          try {
-            imageUrls = typeof facility.image_urls === 'string' 
-              ? JSON.parse(facility.image_urls) 
-              : facility.image_urls;
-          } catch (e) {
-            // If parsing fails, use empty array
-            imageUrls = [];
-          }
-        }
-        // Backward compatibility: if no image_urls but has image_url, add it
-        if (imageUrls.length === 0 && facility.image_url) {
-          imageUrls = [facility.image_url];
-        }
-        return {
-          ...facility,
-          image_urls: imageUrls,
-        };
-      });
-      setFacilities(facilitiesWithParsedUrls);
-    } catch (error) {
-      console.error('Error fetching facilities:', error);
-    } finally {
-      setLoading(false);
+  const list = useServerPagination<Facility>({
+    endpoint: '/facilities',
+    initialSort: 'created_at',
+    initialOrder: 'DESC',
+    extraParams,
+  });
+
+  const parseImages = (f: Facility): string[] => {
+    if (Array.isArray(f.image_urls) && f.image_urls.length > 0) return f.image_urls;
+    if (typeof f.image_urls === 'string') {
+      try {
+        const parsed = JSON.parse(f.image_urls);
+        if (Array.isArray(parsed)) return parsed;
+      } catch { /* ignore */ }
     }
+    return f.image_url ? [f.image_url] : [];
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      alert('Please enter a facility name');
-      return;
-    }
-
-    // Use selectedHotel first, then fallback to URL hotel_id
-    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
-    
-    if (!hotelId && !editingId) {
-      alert('Please select a hotel first');
-      return;
-    }
+    if (!formData.name.trim()) return alert('Please enter a facility name');
+    if (!hotelId && !editingId) return alert('Please select a hotel first');
 
     setSubmitting(true);
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         name: formData.name,
         image_urls: formData.image_urls.length > 0 ? formData.image_urls : (formData.image_url ? [formData.image_url] : []),
         opening_time: formData.opening_time,
         closing_time: formData.closing_time,
         description: formData.description,
       };
+      if (!editingId && hotelId) payload.hotel_id = hotelId;
 
-      // Add hotel_id for new facilities
-      if (!editingId && hotelId) {
-        payload.hotel_id = hotelId;
-      }
+      if (editingId) await api.put(`/facilities/${editingId}`, payload);
+      else await api.post('/facilities', payload);
 
-      if (editingId) {
-        await api.put(`/facilities/${editingId}`, payload);
-      } else {
-        await api.post('/facilities', payload);
-      }
-      setFormData({ name: '', image_url: '', image_urls: [], opening_time: '', closing_time: '', description: '' });
+      setFormData(emptyForm);
       setEditingId(null);
       setView('list');
-      fetchFacilities();
-    } catch (error: any) {
+      list.refresh();
+    } catch (error: unknown) {
       console.error('Error saving facility:', error);
-      alert(error.response?.data?.error || 'Failed to save facility');
+      const msg = (error as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      alert(msg ?? 'Failed to save facility');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleEdit = (facility: Facility) => {
-    const imageUrls = facility.image_urls && facility.image_urls.length > 0 
-      ? facility.image_urls 
-      : (facility.image_url ? [facility.image_url] : []);
-    
-    setFormData({ 
-      name: facility.name, 
+    const imageUrls = parseImages(facility);
+    setFormData({
+      name: facility.name,
       image_url: facility.image_url || '',
       image_urls: imageUrls,
       opening_time: facility.opening_time || '',
@@ -154,138 +113,30 @@ const Facilities = () => {
     if (!confirm('Are you sure you want to delete this facility?')) return;
     try {
       await api.delete(`/facilities/${id}`);
-      fetchFacilities();
+      list.refresh();
     } catch (error) {
       console.error('Error deleting facility:', error);
       alert('Failed to delete facility');
     }
   };
 
-  const handleAddImage = (url: string) => {
-    setFormData({ ...formData, image_urls: [...formData.image_urls, url] });
-  };
-
-  const handleRemoveImage = (index: number) => {
-    setFormData({ 
-      ...formData, 
-      image_urls: formData.image_urls.filter((_, i) => i !== index) 
-    });
-  };
-
-  const getImagesForFacility = (facility: Facility): string[] => {
-    if (facility.image_urls && facility.image_urls.length > 0) {
-      return facility.image_urls;
-    }
-    if (facility.image_url) {
-      return [facility.image_url];
-    }
-    return [];
-  };
-
-  const ImageSlider = ({ images, facilityId }: { images: string[], facilityId: number }) => {
-    const currentIndex = currentImageIndex[facilityId] || 0;
-    
-    if (images.length === 0) {
-      return (
-        <div className="w-full h-64 bg-gray-100 flex items-center justify-center text-gray-400">
-          <ImageIcon size={48} />
-        </div>
-      );
-    }
-
-    if (images.length === 1) {
-      return (
-        <div className="w-full h-64 bg-gray-100 overflow-hidden">
-          <img
-            src={images[0]}
-            alt="Facility"
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        </div>
-      );
-    }
-
-    return (
-      <div className="relative w-full h-64 bg-gray-100 overflow-hidden group">
-        <img
-          src={images[currentIndex]}
-          alt={`Facility image ${currentIndex + 1}`}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none';
-          }}
-        />
-        {images.length > 1 && (
-          <>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setCurrentImageIndex({
-                  ...currentImageIndex,
-                  [facilityId]: (currentIndex - 1 + images.length) % images.length
-                });
-              }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setCurrentImageIndex({
-                  ...currentImageIndex,
-                  [facilityId]: (currentIndex + 1) % images.length
-                });
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
-            >
-              <ChevronRight size={20} />
-            </button>
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5">
-              {images.map((_, idx) => (
-                <div
-                  key={idx}
-                  className={`h-1.5 rounded-full transition-all ${
-                    idx === currentIndex ? 'bg-white w-6' : 'bg-white/50 w-1.5'
-                  }`}
-                />
-              ))}
-            </div>
-          </>
-        )}
-      </div>
-    );
-  };
-
-  // --- CREATE/EDIT VIEW ---
   if (view === 'create' || view === 'edit') {
     return (
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={() => {
-              setView('list');
-              setFormData({ name: '', image_url: '', image_urls: [], opening_time: '', closing_time: '', description: '' });
-              setEditingId(null);
-            }}
+            onClick={() => { setView('list'); setFormData(emptyForm); setEditingId(null); }}
             className="text-gray-500 hover:text-gray-700"
           >
             <ArrowLeft size={24} />
           </button>
-          <h1 className="text-3xl font-bold text-gray-800">
-            {view === 'edit' ? 'Edit Facility' : 'Add New Facility'}
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-800">{view === 'edit' ? 'Edit Facility' : 'Add New Facility'}</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Facility Name *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Facility Name *</label>
               <input
                 type="text"
                 value={formData.name}
@@ -295,25 +146,18 @@ const Facilities = () => {
                 required
               />
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Describe the facility..."
                 rows={3}
                 className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#008491] focus:border-transparent outline-none resize-none"
               />
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Opening Time
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Opening Time</label>
                 <input
                   type="time"
                   value={formData.opening_time}
@@ -322,9 +166,7 @@ const Facilities = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Closing Time
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Closing Time</label>
                 <input
                   type="time"
                   value={formData.closing_time}
@@ -333,29 +175,19 @@ const Facilities = () => {
                 />
               </div>
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Images (Multiple)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Images (Multiple)</label>
               <div className="space-y-3">
                 {formData.image_urls.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {formData.image_urls.map((url, index) => (
                       <div key={index} className="relative group">
                         <div className="relative w-full h-32 rounded-lg overflow-hidden border border-gray-200">
-                          <img
-                            src={url}
-                            alt={`Image ${index + 1}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
+                          <img src={url} alt={`Image ${index + 1}`} className="w-full h-full object-cover" />
                         </div>
                         <button
                           type="button"
-                          onClick={() => handleRemoveImage(index)}
+                          onClick={() => setFormData({ ...formData, image_urls: formData.image_urls.filter((_, i) => i !== index) })}
                           className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <X size={16} />
@@ -367,18 +199,13 @@ const Facilities = () => {
                 <div className="border-2 border-dashed border-gray-200 rounded-lg p-4">
                   <ImageUpload
                     value=""
-                    onChange={handleAddImage}
+                    onChange={(url) => setFormData({ ...formData, image_urls: [...formData.image_urls, url] })}
                     label="Add Image"
                     accept="image/png,image/jpeg,image/jpg"
                     allowedTypes={['png', 'jpeg', 'jpg']}
                     maxSizeMB={2}
                   />
                 </div>
-                {formData.image_urls.length === 0 && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    You can add multiple images. Upload or paste image URLs.
-                  </p>
-                )}
               </div>
             </div>
 
@@ -388,15 +215,11 @@ const Facilities = () => {
                 disabled={submitting}
                 className="flex-1 bg-[#008491] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#006a76] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                {submitting ? 'Saving...' : (view === 'edit' ? 'Update Facility' : 'Create Facility')}
+                {submitting ? 'Saving...' : view === 'edit' ? 'Update Facility' : 'Create Facility'}
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setView('list');
-                  setFormData({ name: '', image_url: '', image_urls: [], opening_time: '', closing_time: '', description: '' });
-                  setEditingId(null);
-                }}
+                onClick={() => { setView('list'); setFormData(emptyForm); setEditingId(null); }}
                 className="px-6 py-3 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-all"
               >
                 Cancel
@@ -408,33 +231,124 @@ const Facilities = () => {
     );
   }
 
-  // --- LIST VIEW ---
+  const columns: Column<Facility>[] = [
+    {
+      key: 'image',
+      header: '',
+      width: 'w-16',
+      render: (f) => {
+        const images = parseImages(f);
+        return (
+          <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+            {images[0] ? (
+              <img src={images[0]} alt={f.name} className="w-full h-full object-cover" />
+            ) : (
+              <ImageIcon size={18} className="text-gray-400" />
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'name',
+      header: 'Name',
+      sortKey: 'name',
+      render: (f) => <span className="font-semibold text-gray-900">{f.name}</span>,
+    },
+    {
+      key: 'hours',
+      header: 'Hours',
+      sortKey: 'opening_time',
+      render: (f) => {
+        // No opening or closing hours configured → facility is open 24 hours.
+        if (!f.opening_time && !f.closing_time) {
+          return (
+            <span className="inline-flex items-center gap-1 text-gray-600 text-sm">
+              <Clock size={12} className="text-gray-400" />
+              24 hours
+            </span>
+          );
+        }
+        return (
+          <span className="inline-flex items-center gap-1 text-gray-600 text-sm">
+            <Clock size={12} className="text-gray-400" />
+            {f.opening_time || '--'} – {f.closing_time || '--'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'description',
+      header: 'Description',
+      render: (f) => {
+        const text = f.description || '';
+        if (!text) return <span className="text-gray-400">—</span>;
+        const isExpanded = expandedIds.has(f.ID);
+        // Heuristic: if the description fits in roughly two lines (~120 chars
+        // at our column width) we skip the toggle to avoid UI noise.
+        const isLong = text.length > 120;
+        return (
+          <div className="max-w-md">
+            <p className={`text-gray-500 text-sm whitespace-pre-wrap ${!isExpanded && isLong ? 'line-clamp-2' : ''}`}>
+              {text}
+            </p>
+            {isLong && (
+              <button
+                type="button"
+                onClick={() => toggleExpanded(f.ID)}
+                className="mt-1 text-xs font-medium text-[#008491] hover:text-[#006a76]"
+              >
+                {isExpanded ? 'Show less' : 'Read more'}
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'actions',
+      header: '',
+      width: 'w-24',
+      align: 'right',
+      render: (f) => (
+        <div className="flex gap-1 justify-end">
+          <button
+            onClick={() => handleEdit(f)}
+            className="p-2 text-gray-400 hover:text-[#008491] hover:bg-[#e0fbfc] rounded-lg transition-colors"
+            title="Edit"
+          >
+            <Edit2 size={16} />
+          </button>
+          <button
+            onClick={() => handleDelete(f.ID)}
+            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
             <Dumbbell className="text-[#008491]" size={32} />
             Facilities
           </h1>
-          <p className="text-gray-500 text-sm mt-1">Manage hotel facilities (Gym, Pool, Spa, etc.)</p>
-          {selectedHotel && (
-            <div className="text-sm text-gray-600 bg-blue-50 px-4 py-2 rounded-lg border border-blue-100 mt-2 inline-block">
-              <span className="font-medium text-blue-900">Showing facilities for:</span>{' '}
-              <span className="font-semibold text-blue-700">{selectedHotel.name}</span>
-            </div>
-          )}
+          <p className="text-gray-500 text-sm mt-1">
+            Manage hotel facilities{selectedHotel ? ` for ${selectedHotel.name}` : ''}
+          </p>
         </div>
-        <button 
+        <button
           onClick={() => {
-            const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
-            if (!hotelId) {
-              alert('Please select a hotel first to add facilities');
-              return;
-            }
+            if (!hotelId) return alert('Please select a hotel first to add facilities');
             setView('create');
           }}
-          disabled={!selectedHotel && !urlHotelId}
+          disabled={!hotelId}
           className="bg-[#008491] text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-[#006a76] shadow-md shadow-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus size={20} />
@@ -442,74 +356,39 @@ const Facilities = () => {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
-          <div className="text-center py-12 text-gray-500">Loading facilities...</div>
-        ) : facilities.length === 0 ? (
-          <div className="text-center py-16">
-            <Dumbbell className="mx-auto text-gray-300 mb-3" size={48} />
-            <h3 className="text-lg font-medium text-gray-900">No Facilities Found</h3>
-            <p className="text-gray-500 mb-4">
-              {selectedHotel || urlHotelId 
-                ? `No facilities found for this hotel. Get started by adding your first facility.`
-                : 'Please select a hotel to view or add facilities.'}
-            </p>
-            {(selectedHotel || urlHotelId) && (
-              <button
-                onClick={() => setView('create')}
-                className="bg-[#008491] text-white px-6 py-2.5 rounded-lg hover:bg-[#006a76] transition-all"
-              >
-                Add Facility
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {facilities.map((facility) => {
-                const images = getImagesForFacility(facility);
-                return (
-                  <div
-                    key={facility.ID}
-                    className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all"
-                  >
-                <ImageSlider images={images} facilityId={facility.ID} />
-                <div className="p-5">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">{facility.name}</h3>
-                  {facility.description && (
-                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">{facility.description}</p>
-                  )}
-                  {(facility.opening_time || facility.closing_time) && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
-                      <Clock size={14} />
-                      <span>
-                        {facility.opening_time || '--'} - {facility.closing_time || '--'}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEdit(facility)}
-                      className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 font-medium transition-all flex items-center justify-center gap-2"
-                    >
-                      <Edit size={16} />
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(facility.ID)}
-                      className="bg-red-50 text-red-600 px-4 py-2 rounded-lg hover:bg-red-100 transition-all"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm mb-4">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+          <input
+            type="text"
+            value={list.search}
+            onChange={(e) => list.setSearch(e.target.value)}
+            placeholder="Search by name or description..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008491] bg-gray-50 focus:bg-white transition-colors"
+          />
+        </div>
       </div>
+
+      {list.error && (
+        <div className="bg-red-50 border border-red-100 text-red-700 px-4 py-2 rounded-lg mb-4 text-sm">{list.error}</div>
+      )}
+
+      <DataTable
+        columns={columns}
+        rows={list.data}
+        loading={list.loading}
+        rowKey={(f) => f.ID}
+        sort={list.sort}
+        order={list.order}
+        onSortChange={list.toggleSort}
+        emptyMessage={
+          !hotelId
+            ? 'Select a hotel to view facilities'
+            : list.search ? `No facilities match "${list.search}"` : 'No facilities yet'
+        }
+      />
+
+      <Pagination meta={list.meta} onPageChange={list.setPage} onLimitChange={list.setLimit} />
     </div>
   );
 };

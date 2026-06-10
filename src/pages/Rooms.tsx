@@ -1,25 +1,20 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
-import { Plus, Edit2, Trash2, ArrowLeft, DoorOpen, Upload, Download, X, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, ArrowLeft, DoorOpen, Upload, Download, X, AlertCircle, CheckCircle, XCircle, Search } from 'lucide-react';
 import { useHotel } from '../context/HotelContext';
 import Modal from '../components/Modal';
+import DataTable, { type Column } from '../components/DataTable';
+import Pagination from '../components/Pagination';
+import { useServerPagination } from '../hooks/useServerPagination';
 import type { Room, Device } from '../types';
 
 const Rooms = () => {
   const { selectedHotel, hotels, setSelectedHotel } = useHotel();
   const [searchParams] = useSearchParams();
-  const [rooms, setRooms] = useState<Room[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
-  const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
-  const [newRoom, setNewRoom] = useState({ 
-    number: '', 
-    type: 'standard', 
-    price: 0, 
-    floor_no: 1, 
-    status: 'available' 
-  });
+  const [newRoom, setNewRoom] = useState({ number: '', type: 'standard', price: 0, floor_no: 1, status: 'available' });
   const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -29,67 +24,64 @@ const Rooms = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Get hotel_id from URL query params as fallback
   const urlHotelId = searchParams.get('hotel_id');
+  const hotelId = selectedHotel?.ID ?? (urlHotelId ? Number(urlHotelId) : null);
 
-  // Set hotel from URL if not already selected
   useEffect(() => {
     if (urlHotelId && hotels.length > 0 && !selectedHotel) {
-      const hotelId = Number(urlHotelId);
-      const hotel = hotels.find(h => h.ID === hotelId);
-      if (hotel) {
-        setSelectedHotel(hotel);
-      }
+      const h = hotels.find((x) => x.ID === Number(urlHotelId));
+      if (h) setSelectedHotel(h);
     }
   }, [urlHotelId, hotels, selectedHotel, setSelectedHotel]);
 
-  useEffect(() => {
-    // Re-fetch when hotel changes or URL hotel_id changes
-    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
-    if (hotelId) {
-      fetchRooms();
-    }
-  }, [selectedHotel, urlHotelId]);
+  const extraParams = useMemo(() => {
+    const p: Record<string, string | number> = {};
+    if (hotelId) p.hotel_id = hotelId;
+    if (filterStatus) p.status = filterStatus;
+    return p;
+  }, [hotelId, filterStatus]);
 
-  const fetchRooms = async () => {
-    // Use selectedHotel first, then fallback to URL hotel_id
-    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
-    if (!hotelId) return;
-    
-    try {
-      setLoading(true);
-      const [roomsResponse, devicesResponse] = await Promise.all([
-        api.get(`/rooms?hotel_id=${hotelId}`),
-        api.get(`/devices?hotel_id=${hotelId}`)
-      ]);
-      setRooms(roomsResponse.data);
-      setDevices(devicesResponse.data || []);
-    } catch (error) {
-      console.error('Error fetching rooms:', error);
-    } finally {
-      setLoading(false);
+  const list = useServerPagination<Room>({
+    endpoint: '/rooms',
+    initialSort: 'floor_no',
+    initialOrder: 'ASC',
+    extraParams,
+  });
+
+  // Devices list is fetched separately so we can show which room has a device.
+  useEffect(() => {
+    if (!hotelId) {
+      setDevices([]);
+      return;
     }
-  };
+    const fetchDevices = async () => {
+      try {
+        const res = await api.get(`/devices?hotel_id=${hotelId}`);
+        setDevices(Array.isArray(res.data) ? res.data : res.data?.data ?? []);
+      } catch (err) {
+        console.error('Error fetching devices:', err);
+      }
+    };
+    fetchDevices();
+  }, [hotelId, list.meta.total]);
 
   const handleAddRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Use selectedHotel first, then fallback to URL hotel_id
-    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
     if (!hotelId) return alert('Please select a hotel first');
-    
     setSubmitting(true);
     try {
       await api.post('/rooms', {
         ...newRoom,
         hotel_id: hotelId,
         price: Number(newRoom.price),
-        floor_no: Number(newRoom.floor_no)
+        floor_no: Number(newRoom.floor_no),
       });
       setNewRoom({ number: '', type: 'standard', price: 0, floor_no: 1, status: 'available' });
       setView('list');
-      fetchRooms();
+      list.refresh();
     } catch (error) {
       console.error('Error adding room:', error);
       alert('Failed to create room');
@@ -101,7 +93,6 @@ const Rooms = () => {
   const handleUpdateRoom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingRoom) return;
-    
     setSubmitting(true);
     try {
       await api.put(`/rooms/${editingRoom.ID}`, {
@@ -109,11 +100,11 @@ const Rooms = () => {
         type: editingRoom.type,
         price: Number(editingRoom.price),
         floor_no: Number(editingRoom.floor_no),
-        status: editingRoom.status
+        status: editingRoom.status,
       });
       setEditingRoom(null);
       setView('list');
-      fetchRooms();
+      list.refresh();
     } catch (error) {
       console.error('Error updating room:', error);
       alert('Failed to update room');
@@ -124,12 +115,11 @@ const Rooms = () => {
 
   const handleDeleteRoom = async () => {
     if (!deletingRoom) return;
-    
     try {
       await api.delete(`/rooms/${deletingRoom.ID}`);
       setShowDeleteModal(false);
       setDeletingRoom(null);
-      fetchRooms();
+      list.refresh();
     } catch (error) {
       console.error('Error deleting room:', error);
       alert('Failed to delete room');
@@ -137,29 +127,23 @@ const Rooms = () => {
   };
 
   const handleClearDevice = async (roomId: number) => {
-    // Find device assigned to this room
-    const device = devices.find(d => d.room_id === roomId);
+    const device = devices.find((d) => d.room_id === roomId);
     if (!device) {
       alert('No device assigned to this room');
       return;
     }
-
-    if (!confirm(`Are you sure you want to clear the device "${device.name}" from Room ${rooms.find(r => r.ID === roomId)?.number}?`)) {
-      return;
-    }
-
+    const room = list.data.find((r) => r.ID === roomId);
+    if (!confirm(`Are you sure you want to clear the device "${device.name}" from Room ${room?.number}?`)) return;
     try {
       await api.patch(`/devices/${device.ID}/clear-room`);
-      fetchRooms(); // Refresh to update device list
+      list.refresh();
     } catch (error) {
       console.error('Error clearing device from room:', error);
       alert('Failed to clear device from room');
     }
   };
 
-  const getDeviceForRoom = (roomId: number): Device | undefined => {
-    return devices.find(d => d.room_id === roomId);
-  };
+  const getDeviceForRoom = (roomId: number): Device | undefined => devices.find((d) => d.room_id === roomId);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -178,77 +162,58 @@ const Rooms = () => {
 202,deluxe,750000,2,available
 301,suite,1200000,3,available
 302,suite,1200000,3,available`;
-
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'rooms_template.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
+    link.href = URL.createObjectURL(blob);
+    link.download = 'rooms_template.csv';
     link.click();
-    document.body.removeChild(link);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-        setUploadError('Please select a CSV file');
-        return;
-      }
-      setUploadFile(file);
-      setUploadError(null);
-      setUploadSuccess(null);
+    if (!file) return;
+    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+      setUploadError('Please select a CSV file');
+      return;
     }
+    setUploadFile(file);
+    setUploadError(null);
+    setUploadSuccess(null);
   };
 
   const handleBulkUpload = async () => {
-    // Use selectedHotel first, then fallback to URL hotel_id
-    const hotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
     if (!hotelId) {
       setUploadError('Please select a hotel first');
       return;
     }
-
     if (!uploadFile) {
       setUploadError('Please select a CSV file');
       return;
     }
-
     setUploading(true);
     setUploadError(null);
     setUploadSuccess(null);
-
     try {
       const formData = new FormData();
       formData.append('file', uploadFile);
-
       const response = await api.post(`/rooms/bulk-upload?hotel_id=${hotelId}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-
       setUploadSuccess(`Successfully created ${response.data.count} rooms`);
       setUploadFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      fetchRooms();
-      
-      // Close modal after 2 seconds
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      list.refresh();
       setTimeout(() => {
         setShowBulkUploadModal(false);
         setUploadSuccess(null);
       }, 2000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error uploading rooms:', error);
-      if (error.response?.data?.errors) {
-        const errors = error.response.data.errors;
-        setUploadError(`Upload failed:\n${errors.join('\n')}`);
+      const e = error as { response?: { data?: { errors?: string[]; error?: string } } };
+      if (e?.response?.data?.errors) {
+        setUploadError(`Upload failed:\n${e.response.data.errors.join('\n')}`);
       } else {
-        setUploadError(error.response?.data?.error || 'Failed to upload rooms. Please check your CSV file format.');
+        setUploadError(e?.response?.data?.error || 'Failed to upload rooms. Please check your CSV file format.');
       }
     } finally {
       setUploading(false);
@@ -259,9 +224,7 @@ const Rooms = () => {
     setUploadFile(null);
     setUploadError(null);
     setUploadSuccess(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // --- CREATE VIEW ---
@@ -269,10 +232,7 @@ const Rooms = () => {
     return (
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
-          <button 
-            onClick={() => setView('list')}
-            className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
-          >
+          <button onClick={() => setView('list')} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors">
             <ArrowLeft size={24} />
           </button>
           <div>
@@ -286,22 +246,11 @@ const Rooms = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Room Number</label>
-                <input 
-                  type="text" 
-                  required
-                  className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
-                  value={newRoom.number}
-                  onChange={(e) => setNewRoom({...newRoom, number: e.target.value})}
-                  placeholder="e.g. 101"
-                />
+                <input type="text" required value={newRoom.number} onChange={(e) => setNewRoom({ ...newRoom, number: e.target.value })} placeholder="e.g. 101" className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Room Type</label>
-                <select 
-                  className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none bg-white"
-                  value={newRoom.type}
-                  onChange={(e) => setNewRoom({...newRoom, type: e.target.value})}
-                >
+                <select value={newRoom.type} onChange={(e) => setNewRoom({ ...newRoom, type: e.target.value })} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none bg-white">
                   <option value="standard">Standard</option>
                   <option value="deluxe">Deluxe</option>
                   <option value="suite">Suite</option>
@@ -309,63 +258,30 @@ const Rooms = () => {
                 </select>
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Price per Night</label>
                 <div className="relative">
                   <span className="absolute left-3 top-3.5 text-gray-500">Rp</span>
-                  <input 
-                    type="number" 
-                    required
-                    className="w-full border p-3 pl-10 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
-                    value={newRoom.price}
-                    onChange={(e) => setNewRoom({...newRoom, price: Number(e.target.value)})}
-                    placeholder="0"
-                    min="0"
-                  />
+                  <input type="number" required min="0" value={newRoom.price} onChange={(e) => setNewRoom({ ...newRoom, price: Number(e.target.value) })} className="w-full border p-3 pl-10 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none" />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Floor Number</label>
-                <input 
-                  type="number" 
-                  required
-                  className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
-                  value={newRoom.floor_no}
-                  onChange={(e) => setNewRoom({...newRoom, floor_no: Number(e.target.value)})}
-                  placeholder="1"
-                  min="1"
-                />
+                <input type="number" required min="1" value={newRoom.floor_no} onChange={(e) => setNewRoom({ ...newRoom, floor_no: Number(e.target.value) })} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none" />
               </div>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select 
-                className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none bg-white"
-                value={newRoom.status}
-                onChange={(e) => setNewRoom({...newRoom, status: e.target.value})}
-              >
+              <select value={newRoom.status} onChange={(e) => setNewRoom({ ...newRoom, status: e.target.value })} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none bg-white">
                 <option value="available">Available</option>
                 <option value="occupied">Occupied</option>
                 <option value="maintenance">Maintenance</option>
               </select>
             </div>
-
             <div className="pt-4 flex justify-end gap-3 border-t border-gray-50">
-              <button 
-                type="button" 
-                onClick={() => setView('list')}
-                className="px-6 py-2.5 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                type="submit" 
-                disabled={submitting}
-                className="px-6 py-2.5 bg-[#008491] text-white hover:bg-[#006a76] rounded-lg font-medium shadow-md shadow-gray-200 disabled:opacity-70 transition-all"
-              >
+              <button type="button" onClick={() => setView('list')} className="px-6 py-2.5 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors">Cancel</button>
+              <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-[#008491] text-white hover:bg-[#006a76] rounded-lg font-medium shadow-md shadow-gray-200 disabled:opacity-70 transition-all">
                 {submitting ? 'Creating...' : 'Create Room'}
               </button>
             </div>
@@ -380,13 +296,7 @@ const Rooms = () => {
     return (
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
-          <button 
-            onClick={() => {
-              setView('list');
-              setEditingRoom(null);
-            }}
-            className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
-          >
+          <button onClick={() => { setView('list'); setEditingRoom(null); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors">
             <ArrowLeft size={24} />
           </button>
           <div>
@@ -400,21 +310,11 @@ const Rooms = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Room Number</label>
-                <input 
-                  type="text" 
-                  required
-                  className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
-                  value={editingRoom.number}
-                  onChange={(e) => setEditingRoom({...editingRoom, number: e.target.value})}
-                />
+                <input type="text" required value={editingRoom.number} onChange={(e) => setEditingRoom({ ...editingRoom, number: e.target.value })} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Room Type</label>
-                <select 
-                  className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none bg-white"
-                  value={editingRoom.type}
-                  onChange={(e) => setEditingRoom({...editingRoom, type: e.target.value})}
-                >
+                <select value={editingRoom.type} onChange={(e) => setEditingRoom({ ...editingRoom, type: e.target.value })} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none bg-white">
                   <option value="standard">Standard</option>
                   <option value="deluxe">Deluxe</option>
                   <option value="suite">Suite</option>
@@ -422,64 +322,30 @@ const Rooms = () => {
                 </select>
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Price per Night</label>
                 <div className="relative">
                   <span className="absolute left-3 top-3.5 text-gray-500">Rp</span>
-                  <input 
-                    type="number" 
-                    required
-                    className="w-full border p-3 pl-10 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
-                    value={editingRoom.price}
-                    onChange={(e) => setEditingRoom({...editingRoom, price: Number(e.target.value)})}
-                    min="0"
-                  />
+                  <input type="number" required min="0" value={editingRoom.price} onChange={(e) => setEditingRoom({ ...editingRoom, price: Number(e.target.value) })} className="w-full border p-3 pl-10 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none" />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Floor Number</label>
-                <input 
-                  type="number" 
-                  required
-                  className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
-                  value={editingRoom.floor_no}
-                  onChange={(e) => setEditingRoom({...editingRoom, floor_no: Number(e.target.value)})}
-                  min="1"
-                />
+                <input type="number" required min="1" value={editingRoom.floor_no} onChange={(e) => setEditingRoom({ ...editingRoom, floor_no: Number(e.target.value) })} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none" />
               </div>
             </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select 
-                className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none bg-white"
-                value={editingRoom.status}
-                onChange={(e) => setEditingRoom({...editingRoom, status: e.target.value})}
-              >
+              <select value={editingRoom.status} onChange={(e) => setEditingRoom({ ...editingRoom, status: e.target.value })} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none bg-white">
                 <option value="available">Available</option>
                 <option value="occupied">Occupied</option>
                 <option value="maintenance">Maintenance</option>
               </select>
             </div>
-
             <div className="pt-4 flex justify-end gap-3 border-t border-gray-50">
-              <button 
-                type="button" 
-                onClick={() => {
-                  setView('list');
-                  setEditingRoom(null);
-                }}
-                className="px-6 py-2.5 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                type="submit" 
-                disabled={submitting}
-                className="px-6 py-2.5 bg-[#008491] text-white hover:bg-[#006a76] rounded-lg font-medium shadow-md shadow-gray-200 disabled:opacity-70 transition-all"
-              >
+              <button type="button" onClick={() => { setView('list'); setEditingRoom(null); }} className="px-6 py-2.5 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors">Cancel</button>
+              <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-[#008491] text-white hover:bg-[#006a76] rounded-lg font-medium shadow-md shadow-gray-200 disabled:opacity-70 transition-all">
                 {submitting ? 'Updating...' : 'Update Room'}
               </button>
             </div>
@@ -490,9 +356,94 @@ const Rooms = () => {
   }
 
   // --- LIST VIEW ---
+  const columns: Column<Room>[] = [
+    {
+      key: 'number',
+      header: 'Room #',
+      sortKey: 'number',
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          <DoorOpen size={16} className="text-gray-400" />
+          <span className="font-semibold text-gray-900">{r.number}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      sortKey: 'type',
+      render: (r) => <span className="text-gray-700 capitalize">{r.type}</span>,
+    },
+    {
+      key: 'floor',
+      header: 'Floor',
+      sortKey: 'floor_no',
+      align: 'center',
+      render: (r) => <span className="text-gray-700">{r.floor_no}</span>,
+    },
+    {
+      key: 'price',
+      header: 'Price',
+      sortKey: 'price',
+      render: (r) => <span className="text-gray-900">Rp {(r.price || 0).toLocaleString()}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortKey: 'status',
+      render: (r) => (
+        <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(r.status)}`}>{r.status}</span>
+      ),
+    },
+    {
+      key: 'device',
+      header: 'Device',
+      render: (r) => {
+        const device = getDeviceForRoom(r.ID);
+        if (!device) return <span className="text-sm text-gray-400">No device</span>;
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-700">{device.name}</span>
+            <button
+              onClick={() => handleClearDevice(r.ID)}
+              className="text-orange-500 hover:text-orange-700 p-1 rounded hover:bg-orange-50 transition-colors"
+              title="Clear device"
+            >
+              <XCircle size={14} />
+            </button>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'actions',
+      header: '',
+      width: 'w-24',
+      align: 'right',
+      render: (r) => (
+        <div className="flex gap-1 justify-end">
+          <button
+            onClick={() => { setEditingRoom(r); setView('edit'); }}
+            className="p-2 text-gray-400 hover:text-[#008491] hover:bg-[#e0fbfc] rounded-lg transition-colors"
+            title="Edit"
+          >
+            <Edit2 size={16} />
+          </button>
+          <button
+            onClick={() => { setDeletingRoom(r); setShowDeleteModal(true); }}
+            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
             <DoorOpen className="text-[#008491]" size={32} />
@@ -501,20 +452,17 @@ const Rooms = () => {
           <p className="text-gray-500 text-sm mt-1">Manage hotel rooms and availability</p>
         </div>
         <div className="flex gap-3">
-          <button 
-            onClick={() => {
-              resetBulkUpload();
-              setShowBulkUploadModal(true);
-            }}
-            disabled={!selectedHotel && !urlHotelId}
+          <button
+            onClick={() => { resetBulkUpload(); setShowBulkUploadModal(true); }}
+            disabled={!hotelId}
             className="bg-gray-100 text-gray-700 px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-gray-200 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Upload size={20} />
             Bulk Upload
           </button>
-          <button 
+          <button
             onClick={() => setView('create')}
-            disabled={!selectedHotel && !urlHotelId}
+            disabled={!hotelId}
             className="bg-[#008491] text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-[#006a76] shadow-md shadow-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={20} />
@@ -523,130 +471,59 @@ const Rooms = () => {
         </div>
       </div>
 
-      {(() => {
-        // Use selectedHotel first, then fallback to URL hotel_id
-        const effectiveHotelId = selectedHotel?.ID || (urlHotelId ? Number(urlHotelId) : null);
-        if (!effectiveHotelId) {
-          return (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <p className="text-yellow-800 text-sm">Please select a hotel first to manage rooms.</p>
+      {!hotelId ? (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-sm text-yellow-800">
+          Please select a hotel first to manage rooms.
+        </div>
+      ) : (
+        <>
+          <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                <input
+                  type="text"
+                  value={list.search}
+                  onChange={(e) => list.setSearch(e.target.value)}
+                  placeholder="Search by number or type..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008491] bg-gray-50 focus:bg-white"
+                />
+              </div>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="border border-gray-200 p-2 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#008491]"
+              >
+                <option value="">All statuses</option>
+                <option value="available">Available</option>
+                <option value="occupied">Occupied</option>
+                <option value="maintenance">Maintenance</option>
+              </select>
             </div>
-          );
-        }
-        return null;
-      })()}
+          </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {loading ? (
-          <div className="text-center py-12 text-gray-500">Loading rooms...</div>
-        ) : rooms.length === 0 ? (
-          <div className="text-center py-16">
-            <DoorOpen className="mx-auto text-gray-300 mb-3" size={48} />
-            <h3 className="text-lg font-medium text-gray-900">No Rooms Found</h3>
-            <p className="text-gray-500 mb-4">Get started by adding your first room.</p>
-            <button 
-              onClick={() => setView('create')}
-              disabled={!selectedHotel && !urlHotelId}
-              className="bg-[#008491] text-white px-6 py-2.5 rounded-lg hover:bg-[#006a76] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              Add Room
-            </button>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Room #</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Floor</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {rooms.map((room) => (
-                  <tr key={room.ID} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <DoorOpen size={18} className="text-gray-400 mr-2" />
-                        <span className="text-sm font-medium text-gray-900">{room.number}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-600 capitalize">{room.type}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-600">{room.floor_no}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">Rp {(room.price || 0).toLocaleString()}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(room.status)}`}>
-                        {room.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {(() => {
-                        const device = getDeviceForRoom(room.ID);
-                        if (device) {
-                          return (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-700">{device.name}</span>
-                              <button
-                                onClick={() => handleClearDevice(room.ID)}
-                                className="text-orange-500 hover:text-orange-700 p-1 rounded hover:bg-orange-50 transition-colors"
-                                title="Clear Device"
-                              >
-                                <XCircle size={16} />
-                              </button>
-                            </div>
-                          );
-                        }
-                        return <span className="text-sm text-gray-400">No device</span>;
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            setEditingRoom(room);
-                            setView('edit');
-                          }}
-                          className="text-[#008491] hover:text-[#006a76] p-1"
-                          title="Edit"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setDeletingRoom(room);
-                            setShowDeleteModal(true);
-                          }}
-                          className="text-red-600 hover:text-red-700 p-1"
-                          title="Delete"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+          {list.error && (
+            <div className="bg-red-50 border border-red-100 text-red-700 px-4 py-2 rounded-lg mb-4 text-sm">{list.error}</div>
+          )}
+
+          <DataTable
+            columns={columns}
+            rows={list.data}
+            loading={list.loading}
+            rowKey={(r) => r.ID}
+            sort={list.sort}
+            order={list.order}
+            onSortChange={list.toggleSort}
+            emptyMessage={list.search ? `No rooms match "${list.search}"` : 'No rooms yet'}
+          />
+
+          <Pagination meta={list.meta} onPageChange={list.setPage} onLimitChange={list.setLimit} />
+        </>
+      )}
 
       <Modal
         isOpen={showDeleteModal}
-        onClose={() => {
-          setShowDeleteModal(false);
-          setDeletingRoom(null);
-        }}
+        onClose={() => { setShowDeleteModal(false); setDeletingRoom(null); }}
         title="Delete Room"
       >
         <div className="p-6">
@@ -654,19 +531,10 @@ const Rooms = () => {
             Are you sure you want to delete room <strong>{deletingRoom?.number}</strong>? This action cannot be undone.
           </p>
           <div className="flex justify-end gap-3">
-            <button
-              onClick={() => {
-                setShowDeleteModal(false);
-                setDeletingRoom(null);
-              }}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors"
-            >
+            <button onClick={() => { setShowDeleteModal(false); setDeletingRoom(null); }} className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors">
               Cancel
             </button>
-            <button
-              onClick={handleDeleteRoom}
-              className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium transition-colors"
-            >
+            <button onClick={handleDeleteRoom} className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium transition-colors">
               Delete
             </button>
           </div>
@@ -675,10 +543,7 @@ const Rooms = () => {
 
       <Modal
         isOpen={showBulkUploadModal}
-        onClose={() => {
-          setShowBulkUploadModal(false);
-          resetBulkUpload();
-        }}
+        onClose={() => { setShowBulkUploadModal(false); resetBulkUpload(); }}
         title="Bulk Upload Rooms"
       >
         <div className="p-6">
@@ -695,19 +560,14 @@ const Rooms = () => {
                 <li><strong>status</strong> - Status: available, occupied, or maintenance (required)</li>
               </ul>
             </div>
-            <button
-              onClick={handleDownloadTemplate}
-              className="text-[#008491] hover:text-[#006a76] flex items-center gap-2 text-sm font-medium"
-            >
+            <button onClick={handleDownloadTemplate} className="text-[#008491] hover:text-[#006a76] flex items-center gap-2 text-sm font-medium">
               <Download size={16} />
               Download CSV Template
             </button>
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select CSV File
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Select CSV File</label>
             <input
               ref={fileInputRef}
               type="file"
@@ -719,12 +579,7 @@ const Rooms = () => {
               <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
                 <span>Selected: {uploadFile.name}</span>
                 <button
-                  onClick={() => {
-                    setUploadFile(null);
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = '';
-                    }
-                  }}
+                  onClick={() => { setUploadFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
                   className="text-red-600 hover:text-red-700"
                 >
                   <X size={16} />
@@ -754,13 +609,7 @@ const Rooms = () => {
           )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-            <button
-              onClick={() => {
-                setShowBulkUploadModal(false);
-                resetBulkUpload();
-              }}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors"
-            >
+            <button onClick={() => { setShowBulkUploadModal(false); resetBulkUpload(); }} className="px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors">
               Cancel
             </button>
             <button

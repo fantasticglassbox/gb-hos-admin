@@ -14,12 +14,8 @@ interface MenuItemFormProps {
 const MenuItemForm = ({ categories, initialCategoryId, editingItem, onSuccess, onCancel }: MenuItemFormProps) => {
   const [loading, setLoading] = useState(false);
   const [categoryId, setCategoryId] = useState<number>(initialCategoryId || (categories[0]?.ID || 0));
-  const [newItem, setNewItem] = useState({ 
-    name: '', 
-    description: '', 
-    price: 0, 
-    image_url: '' 
-  });
+  const emptyItem = { name: '', description: '', price: 0, image_url: '', is_featured: false };
+  const [newItem, setNewItem] = useState(emptyItem);
 
   useEffect(() => {
     if (editingItem) {
@@ -27,13 +23,17 @@ const MenuItemForm = ({ categories, initialCategoryId, editingItem, onSuccess, o
         name: editingItem.name || '',
         description: editingItem.description || '',
         price: editingItem.price || 0,
-        image_url: editingItem.image_url || ''
+        image_url: editingItem.image_url || '',
+        is_featured: editingItem.is_featured ?? false,
       });
       setCategoryId(editingItem.categoryId || initialCategoryId || categories[0]?.ID || 0);
     } else {
-      setNewItem({ name: '', description: '', price: 0, image_url: '' });
+      setNewItem(emptyItem);
       setCategoryId(initialCategoryId || categories[0]?.ID || 0);
     }
+    // emptyItem is a stable literal in this closure; re-running on every render
+    // would defeat the form-reset semantics we want.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingItem, initialCategoryId, categories]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,7 +56,7 @@ const MenuItemForm = ({ categories, initialCategoryId, editingItem, onSuccess, o
           ...newItem
         });
       }
-      setNewItem({ name: '', description: '', price: 0, image_url: '' });
+      setNewItem(emptyItem);
       onSuccess();
     } catch (error) {
       console.error(error);
@@ -121,7 +121,7 @@ const MenuItemForm = ({ categories, initialCategoryId, editingItem, onSuccess, o
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Image</label>
-        <ImageUpload 
+        <ImageUpload
           value={newItem.image_url}
           onChange={(url) => setNewItem({...newItem, image_url: url})}
           label=""
@@ -130,6 +130,19 @@ const MenuItemForm = ({ categories, initialCategoryId, editingItem, onSuccess, o
           maxSizeMB={2}
         />
       </div>
+
+      <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg bg-amber-50/40 hover:bg-amber-50 transition-colors cursor-pointer">
+        <input
+          type="checkbox"
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#008491] focus:ring-[#008491]"
+          checked={newItem.is_featured}
+          onChange={(e) => setNewItem({ ...newItem, is_featured: e.target.checked })}
+        />
+        <span className="flex-1">
+          <span className="block text-sm font-medium text-gray-800">Featured item</span>
+          <span className="block text-xs text-gray-500">Shows in the customer app's Featured carousel above the regular menu.</span>
+        </span>
+      </label>
 
       <div className="flex justify-end gap-2 pt-4">
         <button 

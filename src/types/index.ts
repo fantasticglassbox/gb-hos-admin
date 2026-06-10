@@ -17,6 +17,7 @@ export interface MenuItem {
   description: string;
   price: number;
   image_url: string;
+  is_featured?: boolean;
   modifiers: MenuModifier[];
   categoryId?: number; // Helper for filtering
   categoryName?: string; // Helper for filtering
@@ -26,6 +27,8 @@ export interface MenuCategory {
   ID: number;
   name: string;
   items: MenuItem[];
+  // Present only when fetched with include_disabled=true. Non-null = soft-deleted ("disabled").
+  DeletedAt?: string | null;
 }
 
 export interface Service {

@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import api from '../services/api';
-import { Plus, MapPin, Building2, ArrowLeft, X, Edit2, Trash2 } from 'lucide-react';
+import { Plus, MapPin, Building2, ArrowLeft, X, Edit2, Trash2, Search } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { useHotel } from '../context/HotelContext';
+import { useServerPagination } from '../hooks/useServerPagination';
+import DataTable, { type Column } from '../components/DataTable';
+import Pagination from '../components/Pagination';
 
 interface Hotel {
   ID: number;
@@ -13,37 +16,28 @@ interface Hotel {
   image_url: string;
 }
 
+const emptyForm = { name: '', address: '', description: '', image_url: '', facilities: '[]' };
+
 const Hotels = () => {
-  const { fetchHotels } = useHotel(); // To refresh selector after adding
-  const [hotels, setHotels] = useState<Hotel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { fetchHotels } = useHotel();
   const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
-  const [newHotel, setNewHotel] = useState({ name: '', address: '', description: '', image_url: '', facilities: '[]' });
+  const [newHotel, setNewHotel] = useState(emptyForm);
   const [editingHotel, setEditingHotel] = useState<Hotel | null>(null);
   const [facilitiesList, setFacilitiesList] = useState<string[]>([]);
   const [facilityInput, setFacilityInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    loadHotels();
-  }, []);
-
-  const loadHotels = async () => {
-    try {
-      const response = await api.get('/hotels');
-      setHotels(response.data);
-    } catch (error) {
-      console.error('Error fetching hotels:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const list = useServerPagination<Hotel>({
+    endpoint: '/hotels',
+    initialSort: 'created_at',
+    initialOrder: 'DESC',
+  });
 
   const addFacility = () => {
     if (facilityInput.trim()) {
       const updated = [...facilitiesList, facilityInput.trim()];
       setFacilitiesList(updated);
-      setNewHotel({...newHotel, facilities: JSON.stringify(updated)});
+      setNewHotel({ ...newHotel, facilities: JSON.stringify(updated) });
       setFacilityInput('');
     }
   };
@@ -51,7 +45,13 @@ const Hotels = () => {
   const removeFacility = (index: number) => {
     const updated = facilitiesList.filter((_, i) => i !== index);
     setFacilitiesList(updated);
-    setNewHotel({...newHotel, facilities: JSON.stringify(updated)});
+    setNewHotel({ ...newHotel, facilities: JSON.stringify(updated) });
+  };
+
+  const resetForm = () => {
+    setNewHotel(emptyForm);
+    setFacilitiesList([]);
+    setEditingHotel(null);
   };
 
   const handleAddHotel = async (e: React.FormEvent) => {
@@ -59,11 +59,10 @@ const Hotels = () => {
     setSubmitting(true);
     try {
       await api.post('/hotels', newHotel);
-      setNewHotel({ name: '', address: '', description: '', image_url: '', facilities: '[]' });
-      setFacilitiesList([]);
+      resetForm();
       setView('list');
-      loadHotels();
-      fetchHotels(); // Refresh global context
+      list.refresh();
+      fetchHotels();
     } catch (error) {
       console.error('Error creating hotel:', error);
       alert('Failed to create hotel');
@@ -74,14 +73,16 @@ const Hotels = () => {
 
   const handleEditHotel = (hotel: Hotel) => {
     setEditingHotel(hotel);
-    const facilities = hotel.facilities ? (typeof hotel.facilities === 'string' ? JSON.parse(hotel.facilities) : hotel.facilities) : [];
-    setFacilitiesList(facilities);
+    const parsed = hotel.facilities
+      ? (typeof hotel.facilities === 'string' ? JSON.parse(hotel.facilities) : hotel.facilities)
+      : [];
+    setFacilitiesList(parsed);
     setNewHotel({
       name: hotel.name,
       address: hotel.address,
       description: hotel.description,
       image_url: hotel.image_url,
-      facilities: JSON.stringify(facilities)
+      facilities: JSON.stringify(parsed),
     });
     setView('edit');
   };
@@ -92,12 +93,10 @@ const Hotels = () => {
     setSubmitting(true);
     try {
       await api.put(`/hotels/${editingHotel.ID}`, newHotel);
-      setNewHotel({ name: '', address: '', description: '', image_url: '', facilities: '[]' });
-      setFacilitiesList([]);
-      setEditingHotel(null);
+      resetForm();
       setView('list');
-      loadHotels();
-      fetchHotels(); // Refresh global context
+      list.refresh();
+      fetchHotels();
     } catch (error) {
       console.error('Error updating hotel:', error);
       alert('Failed to update hotel');
@@ -107,13 +106,11 @@ const Hotels = () => {
   };
 
   const handleDeleteHotel = async (hotel: Hotel) => {
-    if (!confirm(`Are you sure you want to delete "${hotel.name}"? This action cannot be undone.`)) {
-      return;
-    }
+    if (!confirm(`Are you sure you want to delete "${hotel.name}"? This action cannot be undone.`)) return;
     try {
       await api.delete(`/hotels/${hotel.ID}`);
-      loadHotels();
-      fetchHotels(); // Refresh global context
+      list.refresh();
+      fetchHotels();
     } catch (error) {
       console.error('Error deleting hotel:', error);
       alert('Failed to delete hotel');
@@ -125,8 +122,8 @@ const Hotels = () => {
     return (
       <div className="max-w-3xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
-          <button 
-            onClick={() => setView('list')}
+          <button
+            onClick={() => { setView('list'); resetForm(); }}
             className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
           >
             <ArrowLeft size={24} />
@@ -142,12 +139,12 @@ const Hotels = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Hotel Name</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
                   className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
                   value={newHotel.name}
-                  onChange={(e) => setNewHotel({...newHotel, name: e.target.value})}
+                  onChange={(e) => setNewHotel({ ...newHotel, name: e.target.value })}
                   placeholder="e.g. Grand Hyatt Jakarta"
                 />
               </div>
@@ -155,24 +152,24 @@ const Hotels = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
                 <div className="relative">
                   <MapPin className="absolute left-3 top-3.5 text-gray-400" size={18} />
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     required
                     className="w-full border p-3 pl-10 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
                     value={newHotel.address}
-                    onChange={(e) => setNewHotel({...newHotel, address: e.target.value})}
+                    onChange={(e) => setNewHotel({ ...newHotel, address: e.target.value })}
                     placeholder="City, Country"
                   />
                 </div>
               </div>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-              <textarea 
+              <textarea
                 className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
                 value={newHotel.description}
-                onChange={(e) => setNewHotel({...newHotel, description: e.target.value})}
+                onChange={(e) => setNewHotel({ ...newHotel, description: e.target.value })}
                 rows={4}
                 placeholder="Brief description of the property..."
               />
@@ -181,8 +178,8 @@ const Hotels = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Facilities</label>
               <div className="flex gap-2 mb-3">
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   className="flex-1 border p-3 rounded-lg focus:ring-2 focus:ring-[#008491] outline-none"
                   value={facilityInput}
                   onChange={(e) => setFacilityInput(e.target.value)}
@@ -194,7 +191,7 @@ const Hotels = () => {
                     }
                   }}
                 />
-                <button 
+                <button
                   type="button"
                   onClick={addFacility}
                   className="bg-gray-100 text-gray-700 px-4 rounded-lg hover:bg-gray-200 font-medium"
@@ -202,7 +199,7 @@ const Hotels = () => {
                   Add
                 </button>
               </div>
-              
+
               {facilitiesList.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
                   {facilitiesList.map((f, i) => (
@@ -220,9 +217,9 @@ const Hotels = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Cover Image</label>
               <div className="border-2 border-dashed border-gray-200 rounded-xl p-4">
-                <ImageUpload 
+                <ImageUpload
                   value={newHotel.image_url}
-                  onChange={(url) => setNewHotel({...newHotel, image_url: url})}
+                  onChange={(url) => setNewHotel({ ...newHotel, image_url: url })}
                   label="Click to upload cover image"
                   accept="image/png,image/jpeg,image/jpg"
                   allowedTypes={['png', 'jpeg', 'jpg']}
@@ -232,20 +229,15 @@ const Hotels = () => {
             </div>
 
             <div className="pt-4 flex justify-end gap-3 border-t border-gray-50">
-              <button 
-                type="button" 
-                onClick={() => {
-                  setView('list');
-                  setEditingHotel(null);
-                  setNewHotel({ name: '', address: '', description: '', image_url: '', facilities: '[]' });
-                  setFacilitiesList([]);
-                }}
+              <button
+                type="button"
+                onClick={() => { setView('list'); resetForm(); }}
                 className="px-6 py-2.5 text-gray-600 hover:bg-gray-50 rounded-lg font-medium transition-colors"
               >
                 Cancel
               </button>
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 disabled={submitting}
                 className="px-6 py-2.5 bg-[#008491] text-white hover:bg-[#006a76] rounded-lg font-medium shadow-md shadow-gray-200 disabled:opacity-70 transition-all"
               >
@@ -259,14 +251,79 @@ const Hotels = () => {
   }
 
   // --- LIST VIEW ---
+  const columns: Column<Hotel>[] = [
+    {
+      key: 'image',
+      header: '',
+      width: 'w-16',
+      render: (h) => (
+        <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden flex items-center justify-center">
+          {h.image_url ? (
+            <img src={h.image_url} alt={h.name} className="w-full h-full object-cover" />
+          ) : (
+            <Building2 size={20} className="text-gray-400" />
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'name',
+      header: 'Name',
+      sortKey: 'name',
+      render: (h) => <span className="font-semibold text-gray-900">{h.name}</span>,
+    },
+    {
+      key: 'address',
+      header: 'Address',
+      sortKey: 'address',
+      render: (h) => (
+        <div className="flex items-center gap-1 text-gray-600">
+          <MapPin size={14} className="text-gray-400 shrink-0" />
+          <span className="truncate">{h.address}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'description',
+      header: 'Description',
+      render: (h) => (
+        <span className="text-gray-500 line-clamp-2 max-w-md inline-block">{h.description || '—'}</span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      width: 'w-28',
+      align: 'right',
+      render: (h) => (
+        <div className="flex gap-1 justify-end">
+          <button
+            onClick={(e) => { e.stopPropagation(); handleEditHotel(h); }}
+            className="p-2 text-gray-400 hover:text-[#008491] hover:bg-[#e0fbfc] rounded-lg transition-colors"
+            title="Edit"
+          >
+            <Edit2 size={16} />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); handleDeleteHotel(h); }}
+            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Delete"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Hotel Management</h1>
           <p className="text-gray-500 text-sm mt-1">Manage properties and locations</p>
         </div>
-        <button 
+        <button
           onClick={() => setView('create')}
           className="bg-[#008491] text-white px-5 py-2.5 rounded-lg flex items-center gap-2 hover:bg-[#006a76] shadow-md shadow-gray-200 transition-all"
         >
@@ -275,54 +332,41 @@ const Hotels = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading ? (
-          <p className="text-gray-500 col-span-full text-center py-12">Loading hotels...</p>
-        ) : hotels.map((hotel) => (
-          <div key={hotel.ID} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-md transition-shadow">
-            <div className="relative h-48 bg-gray-100">
-              {hotel.image_url ? (
-                <img 
-                  src={hotel.image_url} 
-                  alt={hotel.name} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400">
-                  <Building2 size={48} />
-                </div>
-              )}
-            </div>
-            <div className="p-5">
-              <h3 className="font-bold text-lg text-gray-900 mb-1">{hotel.name}</h3>
-              <div className="flex items-center gap-1 text-gray-500 text-sm mb-3">
-                <MapPin size={14} />
-                <span>{hotel.address}</span>
-              </div>
-              <p className="text-gray-600 text-sm line-clamp-2 mb-4 min-h-[40px]">{hotel.description}</p>
-              
-              <div className="pt-4 border-t border-gray-50 flex justify-between items-center">
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => handleEditHotel(hotel)}
-                    className="p-2 text-gray-400 hover:text-[#008491] hover:bg-[#e0fbfc] rounded-lg transition-colors"
-                    title="Edit Hotel"
-                  >
-                    <Edit2 size={18} />
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteHotel(hotel)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Delete Hotel"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm mb-4">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+          <input
+            type="text"
+            value={list.search}
+            onChange={(e) => list.setSearch(e.target.value)}
+            placeholder="Search by name, address, description..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#008491] bg-gray-50 focus:bg-white transition-colors"
+          />
+        </div>
       </div>
+
+      {list.error && (
+        <div className="bg-red-50 border border-red-100 text-red-700 px-4 py-2 rounded-lg mb-4 text-sm">
+          {list.error}
+        </div>
+      )}
+
+      <DataTable
+        columns={columns}
+        rows={list.data}
+        loading={list.loading}
+        rowKey={(h) => h.ID}
+        sort={list.sort}
+        order={list.order}
+        onSortChange={list.toggleSort}
+        emptyMessage={list.search ? `No hotels match "${list.search}"` : 'No hotels yet'}
+      />
+
+      <Pagination
+        meta={list.meta}
+        onPageChange={list.setPage}
+        onLimitChange={list.setLimit}
+      />
     </div>
   );
 };

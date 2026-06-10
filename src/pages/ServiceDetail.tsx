@@ -5,19 +5,23 @@ import { Plus, Settings, Search, Filter, Edit2, Trash2 } from 'lucide-react';
 
 import type { Service, MenuItem, MenuCategory } from '../types';
 import Modal from '../components/Modal';
-import CategoryForm from '../components/forms/CategoryForm';
 import MenuItemForm from '../components/forms/MenuItemForm';
 import ModifierManager from '../components/forms/ModifierManager';
 import ImageUpload from '../components/ImageUpload';
+import CategoriesTab from '../components/CategoriesTab';
+
+type Tab = 'items' | 'categories';
 
 const ServiceDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
-  
+  const [activeTab, setActiveTab] = useState<Tab>('items');
+  // Bumped to ask CategoriesTab to re-fetch (e.g. after an item add changes counts).
+  const [categoriesRefreshKey, setCategoriesRefreshKey] = useState(0);
+
   // Modal States
-  const [showCatModal, setShowCatModal] = useState(false);
   const [showItemModal, setShowItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [activeCategory, setActiveCategory] = useState<number | undefined>(undefined);
@@ -126,6 +130,7 @@ const ServiceDetail = () => {
     try {
       await api.delete(`/menu/items/${item.ID}`);
       fetchService();
+      setCategoriesRefreshKey((k) => k + 1);
     } catch (error) {
       console.error('Error deleting item:', error);
       alert('Failed to delete item');
@@ -154,27 +159,58 @@ const ServiceDetail = () => {
         </div>
         
         <div className="flex gap-3">
-          <button 
+          <button
             onClick={() => setShowSettingsModal(true)}
             className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 hover:border-gray-300 flex items-center gap-2 transition-all shadow-sm"
           >
             <Settings size={18} /> Settings
           </button>
-          <button 
-            onClick={() => setShowCatModal(true)}
-            className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 hover:border-gray-300 flex items-center gap-2 transition-all shadow-sm"
-          >
-            <Plus size={18} /> New Category
-          </button>
-          <button 
-            onClick={() => openItemModal()}
-            className="bg-[#008491] text-white px-4 py-2 rounded-lg hover:bg-[#006a76] flex items-center gap-2 shadow-md shadow-gray-200 transition-all"
-          >
-            <Plus size={18} /> New Item
-          </button>
+          {activeTab === 'items' && (
+            <button
+              onClick={() => openItemModal()}
+              className="bg-[#008491] text-white px-4 py-2 rounded-lg hover:bg-[#006a76] flex items-center gap-2 shadow-md shadow-gray-200 transition-all"
+            >
+              <Plus size={18} /> New Item
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="flex gap-1">
+          {([
+            { key: 'items' as Tab, label: 'Items', count: allItems.length },
+            { key: 'categories' as Tab, label: 'Categories', count: service.categories.length },
+          ]).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`px-4 py-2.5 -mb-px border-b-2 font-medium text-sm transition-colors ${
+                activeTab === t.key
+                  ? 'border-[#008491] text-[#008491]'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {t.label}
+              <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${activeTab === t.key ? 'bg-[#e0fbfc] text-[#008491]' : 'bg-gray-100 text-gray-500'}`}>
+                {t.count}
+              </span>
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {activeTab === 'categories' && (
+        <CategoriesTab
+          serviceId={id!}
+          refreshKey={categoriesRefreshKey}
+          onChange={() => fetchService()}
+        />
+      )}
+
+      {activeTab === 'items' && (
+      <>
       {/* Toolbar: Search & Filter */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
         <div className="flex-1 relative group">
@@ -308,7 +344,7 @@ const ServiceDetail = () => {
           <div className="flex items-center px-4 text-gray-600 bg-white border border-gray-100 rounded-lg">
             Page {currentPage} of {totalPages}
           </div>
-          <button 
+          <button
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
             className="px-4 py-2 border border-gray-200 bg-white text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors shadow-sm"
@@ -317,31 +353,21 @@ const ServiceDetail = () => {
           </button>
         </div>
       )}
+      </>
+      )}
 
       {/* --- MODALS --- */}
 
-      <Modal 
-        isOpen={showCatModal} 
-        onClose={() => setShowCatModal(false)} 
-        title="Create New Category"
-      >
-        <CategoryForm 
-          serviceId={id!} 
-          onSuccess={() => { setShowCatModal(false); fetchService(); }} 
-          onCancel={() => setShowCatModal(false)}
-        />
-      </Modal>
-
-      <Modal 
-        isOpen={showItemModal} 
+      <Modal
+        isOpen={showItemModal}
         onClose={() => { setShowItemModal(false); setEditingItem(null); }} 
         title={editingItem ? "Edit Menu Item" : "Add New Menu Item"}
       >
-        <MenuItemForm 
-          categories={service.categories} 
-          initialCategoryId={activeCategory} 
+        <MenuItemForm
+          categories={service.categories}
+          initialCategoryId={activeCategory}
           editingItem={editingItem}
-          onSuccess={() => { setShowItemModal(false); setEditingItem(null); fetchService(); }} 
+          onSuccess={() => { setShowItemModal(false); setEditingItem(null); fetchService(); setCategoriesRefreshKey((k) => k + 1); }}
           onCancel={() => { setShowItemModal(false); setEditingItem(null); }}
         />
       </Modal>
