@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Save, Image as ImageIcon, AlertCircle, Globe, Layout, Type, Phone, Plus, Trash2 } from 'lucide-react';
+import { Save, Image as ImageIcon, AlertCircle, Globe, Layout, Type, Phone, Plus, Trash2, RefreshCw } from 'lucide-react';
 import ImageUpload from '../components/ImageUpload';
 import { useHotel } from '../context/HotelContext';
 
@@ -20,6 +20,7 @@ const HotelSettings = () => {
     no_item_section: 2,
     display_size: 'normal',
     call_extensions: '[]',
+    auto_checkout: false,
   });
 
   interface CallExtension {
@@ -44,6 +45,7 @@ const HotelSettings = () => {
         no_item_section: 2,
         display_size: 'normal',
         call_extensions: '[]',
+        auto_checkout: false,
       });
       setCallExtensions([]);
     }
@@ -72,6 +74,7 @@ const HotelSettings = () => {
         no_item_section: response.data.no_item_section || 2,
         display_size: response.data.display_size || 'normal',
         call_extensions: callExtensionsData,
+        auto_checkout: response.data.auto_checkout ?? false,
       });
       setCallExtensions(parsedExtensions);
     } catch (error: any) {
@@ -86,6 +89,7 @@ const HotelSettings = () => {
           no_item_section: 2,
           display_size: 'normal',
           call_extensions: '[]',
+          auto_checkout: false,
         });
         setCallExtensions([]);
       } else {
@@ -117,6 +121,7 @@ const HotelSettings = () => {
         no_item_section: formData.no_item_section,
         display_size: formData.display_size,
         call_extensions: JSON.stringify(callExtensions),
+        auto_checkout: formData.auto_checkout,
       });
       
       setMessage({ type: 'success', text: 'Settings saved successfully!' });
@@ -402,6 +407,36 @@ const HotelSettings = () => {
                   Recommended for guests who need larger text and easier-to-tap elements.
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Guest Privacy Section */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <RefreshCw size={20} className="text-[#008491]" />
+              Guest Privacy
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Orders and chat messages are tied to a guest's stay, so they disappear from the room tablet when that stay ends. If your team leaves rooms occupied instead of checking guests out, the stay never ends and the next guest can still see the previous guest's history.
+            </p>
+
+            <div className="space-y-4">
+              <label className="flex items-start gap-3 p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={formData.auto_checkout}
+                  onChange={(e) => setFormData({ ...formData, auto_checkout: e.target.checked })}
+                  className="mt-1 h-4 w-4 text-[#008491] border-gray-300 rounded focus:ring-[#008491]"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-gray-700">
+                    Reset guest history nightly
+                  </span>
+                  <span className="block text-xs text-gray-500 mt-1">
+                    Once a night, every occupied room is checked out and checked straight back in. Rooms stay occupied and guest details are kept, but each room starts a fresh stay, so orders and chats no longer carry over. Any order still being prepared at that moment disappears from the guest's screen.
+                  </span>
+                </span>
+              </label>
             </div>
           </div>
 

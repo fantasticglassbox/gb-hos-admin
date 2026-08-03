@@ -84,4 +84,5 @@ export interface HotelSetting {
   default_layout?: string; // "list" or "grid"
   no_item_section?: number; // Number of items per section for grid layout
   display_size?: string; // "normal", "large", "extra_large" - Controls UI scaling for accessibility
+  auto_checkout?: boolean; // Nightly stay reset: cycles every occupied room's check-in so guest history doesn't carry over
 }
